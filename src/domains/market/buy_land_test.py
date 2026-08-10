@@ -1,0 +1,167 @@
+import pytest
+
+from tests.fixtures import _make_env
+from src.domains.market.buy_land import buy_land, QUADRANT_COST
+from src.models.action import BuyLandActionState, PassActionState
+from src.models.environment import StepState
+from src.models.farm import WeedState
+
+
+def _locked_tiles(board=10):
+    """Tiles with NW unlocked (None) and NE/SW/SE LOCKED."""
+    tiles = [[None] * board for _ in range(board)]
+    half = board // 2
+    for r in range(board):
+        for c in range(board):
+            if r >= half or c >= half:  # not NW
+                tiles[r][c] = "LOCKED"
+    return tiles
+
+
+def _quadrant_tiles(quadrant, board=10):
+    """Return the set of (row, col) positions for a quadrant."""
+    half = board // 2
+    ranges = {
+        "NW": [(r, c) for r in range(0, half) for c in range(0, half)],
+        "NE": [(r, c) for r in range(0, half) for c in range(half, board)],
+        "SW": [(r, c) for r in range(half, board) for c in range(0, half)],
+        "SE": [(r, c) for r in range(half, board) for c in range(half, board)],
+    }
+    return ranges[quadrant]
+
+
+# ---------------------------------------------------------------------------
+# Successful unlock — fixed order NE -> SW -> SE, increasing cost.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("step_index, quadrant, cumulative_cost", [
+    (0, "NE", 1000), (1, "SW", 1000 + 2000), (2, "SE", 1000 + 2000 + 4000),
+])
+def test_buy_land_unlocks_quadrants_in_order(step_index, quadrant, cumulative_cost):
+    env = _make_env(farmer=(4, 4), tiles=_locked_tiles())
+    farm = env.state.farms[0]
+    farm.money = 10000.0
+
+    for _ in range(step_index + 1):
+        buy_land(env.state, BuyLandActionState(type="BUY_LAND"))
+
+    assert quadrant in farm.unlocked_quadrants
+    assert farm.money == 10000.0 - cumulative_cost
+
+
+def test_buy_land_unlocks_all_three_in_sequence():
+    env = _make_env(farmer=(4, 4), tiles=_locked_tiles())
+    farm = env.state.farms[0]
+    farm.money = 10000.0
+
+    buy_land(env.state, BuyLandActionState(type="BUY_LAND"))  # NE, $1k
+    buy_land(env.state, BuyLandActionState(type="BUY_LAND"))  # SW, $2k
+    buy_land(env.state, BuyLandActionState(type="BUY_LAND"))  # SE, $4k
+
+    assert set(farm.unlocked_quadrants) == {"NW", "NE", "SW", "SE"}
+    assert farm.money == 10000.0 - (1000 + 2000 + 4000)
+
+
+# ---------------------------------------------------------------------------
+# Locked tiles in the unlocked quadrant become None.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("quadrant", ["NE", "SW", "SE"])
+def test_buy_land_converts_locked_tiles_to_none(quadrant):
+    env = _make_env(farmer=(4, 4), tiles=_locked_tiles())
+    farm = env.state.farms[0]
+    farm.money = 10000.0
+
+    # Unlock all quadrants up to and including the target.
+    while quadrant not in farm.unlocked_quadrants:
+        buy_land(env.state, BuyLandActionState(type="BUY_LAND"))
+
+    for r, c in _quadrant_tiles(quadrant):
+        assert farm.tiles[r][c] is None  # was LOCKED, now empty
+
+
+def test_buy_land_does_not_touch_already_unlocked_quadrants():
+    env = _make_env(farmer=(4, 4), tiles=_locked_tiles())
+    farm = env.state.farms[0]
+    farm.money = 10000.0
+
+    # Place a plant in NW (already unlocked) to verify it's untouched.
+    farm.tiles[0][0] = "PLANT_MARKER"
+    buy_land(env.state, BuyLandActionState(type="BUY_LAND"))  # unlock NE
+
+    assert farm.tiles[0][0] == "PLANT_MARKER"  # NW untouched
+
+
+def test_buy_land_preserves_non_locked_tiles_in_quadrant():
+    """Tiles in the unlocked quadrant that aren't LOCKED are left as-is."""
+    tiles = _locked_tiles()
+    marker = WeedState()
+    tiles[0][5] = marker  # a non-LOCKED tile in NE quadrant
+    env = _make_env(farmer=(4, 4), tiles=tiles)
+    farm = env.state.farms[0]
+    farm.money = 10000.0
+
+    buy_land(env.state, BuyLandActionState(type="BUY_LAND"))  # unlock NE
+
+    assert isinstance(farm.tiles[0][5], WeedState)  # not a LOCKED tile, untouched
+
+
+# ---------------------------------------------------------------------------
+# No-op conditions.
+# ---------------------------------------------------------------------------
+
+def test_buy_land_noop_when_cannot_afford():
+    env = _make_env(farmer=(4, 4), tiles=_locked_tiles())
+    farm = env.state.farms[0]
+    farm.money = 500.0  # less than NE cost ($1k)
+
+    buy_land(env.state, BuyLandActionState(type="BUY_LAND"))
+
+    assert farm.unlocked_quadrants == ["NW"]  # nothing unlocked
+    assert farm.money == 500.0
+    # NE tiles still LOCKED
+    assert farm.tiles[0][5] == "LOCKED"
+
+
+def test_buy_land_noop_when_all_quadrants_unlocked():
+    env = _make_env(farmer=(4, 4), tiles=_locked_tiles())
+    farm = env.state.farms[0]
+    farm.money = 10000.0
+    farm.unlocked_quadrants = ["NW", "NE", "SW", "SE"]
+
+    buy_land(env.state, BuyLandActionState(type="BUY_LAND"))
+
+    assert farm.money == 10000.0  # no cost
+    assert len(farm.unlocked_quadrants) == 4  # unchanged
+
+
+def test_buy_land_exact_money_buys_quadrant():
+    env = _make_env(farmer=(4, 4), tiles=_locked_tiles())
+    farm = env.state.farms[0]
+    farm.money = 1000.0  # exactly NE cost
+
+    buy_land(env.state, BuyLandActionState(type="BUY_LAND"))
+
+    assert "NE" in farm.unlocked_quadrants
+    assert farm.money == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Integration: dispatch through Environment.step() reaches buy_land.
+# ---------------------------------------------------------------------------
+
+def test_step_dispatches_buy_land_action():
+    env = _make_env(farmer=(4, 4), tiles=_locked_tiles())
+    farm = env.state.farms[0]
+    farm.money = 5000.0
+
+    step = StepState(
+        farmer=PassActionState(type="PASS"),
+        hands=[],
+        market=[BuyLandActionState(type="BUY_LAND")],
+    )
+    env.step(step)
+
+    assert "NE" in farm.unlocked_quadrants
+    assert farm.money == 5000.0 - QUADRANT_COST["NE"]
+    assert farm.tiles[0][5] is None  # NE unlocked

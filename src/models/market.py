@@ -39,4 +39,3 @@ class MarketState(BaseModel):
     prices: MarketPrices = Field(
         description="Current prices for all tradable goods."
     )
-

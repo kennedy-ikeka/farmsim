@@ -1,31 +1,37 @@
 from enum import Enum
-from typing import Optional
-from typing_extensions import Literal
 
 from pydantic import BaseModel, Field
 
+from src.models.action import FarmActionState, MarketActionState, PassActionState
+from src.models.game import GameState, Reality
+from src.models.event import EventState
 
-from pydantic import BaseModel, Field
 
-
-class MoveState(BaseModel):
+class StepState(BaseModel):
     """The next set of actions for the farm."""
 
-    farmer: dict = Field(
-        default_factory=lambda: {"action": "Pass"},
+    farmer: FarmActionState = Field(
+        default_factory=PassActionState,
         description="The farmer's next action."
     )
 
-    hands: list[dict] = Field(
+    hands: list[FarmActionState] = Field(
         default_factory=list,
         description="The next actions assigned to hired workers."
     )
 
-    market: list[dict] = Field(
+    market: list[MarketActionState] = Field(
         default_factory=list,
         description="The next market actions."
     )
 
 
+class StepResultState(BaseModel):
+    state: GameState = Field(description="The analyzed state of the game")
+    reward: dict[int, float] = Field(default_factory=dict, description="The reward from the step")
+    done: bool = Field(default=False, description="Has the step completed")
+
+
 class EnvironmentState(BaseModel):
-    ...
+    state: GameState = Field(description="The analyzed state of the game")
+    events: list[EventState] = Field(default_factory=list, description="All events in the environment")
