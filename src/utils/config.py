@@ -50,3 +50,20 @@ MODEL_DIR = os.path.join(BASE_DIR, "models")
 # LLM configuration
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL')
 OLLAMA_API_KEY = os.getenv('OLLAMA_API_KEY')
+
+# ---------------------------------------------------------------------------
+# Game (simulation) configuration constants.
+# Sourced from the Configuration Defaults table in README.md.
+# ---------------------------------------------------------------------------
+SHED_CAPACITY = 100
+WEED_SPAWN_CHANCE = 0.005
+TURNS_PER_DAY = 24
+MAX_MARKET_ORDERS_PER_TURN = 10
+EPISODE_STEPS = 720
+STARTING_MONEY = 3000
+BOARD_SIZE = 10
+
+# Town building intervals (per README "Town Buildings" + Configuration Defaults).
+TOWN_SHOP_UNLOCK_INTERVAL = 3   # days between successive shop unlocks
+TOWN_SHOP_SELL_INTERVAL = 4     # turns between consumption ticks per unlocked shop
+TOWN_CENTER_SELL_INTERVAL = 12  # turns between town-center consumption ticks

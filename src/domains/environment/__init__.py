@@ -1,3 +1,3 @@
-from src.domains.environment.controller import Environment
+from src.domains.environment.environment import Environment
 
 __all__ = ["Environment"]

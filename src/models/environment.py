@@ -1,9 +1,11 @@
 from enum import Enum
+import random
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
+from src.domains.environment.clock import Clock
 from src.models.action import FarmActionState, MarketActionState, PassActionState
-from src.models.game import GameState, Reality
+from src.models.game import GameState
 from src.models.event import EventState
 
 
@@ -32,6 +34,20 @@ class StepResultState(BaseModel):
     done: bool = Field(default=False, description="Has the step completed")
 
 
+class TurnActions(BaseModel):
+    """All players' actions for a single step, indexed by player id."""
+    actions: list[StepState] = Field(
+        description="Per-player turn payloads; actions[p] is player p's actions."
+    )
+
+
 class EnvironmentState(BaseModel):
+    seed: int = Field(description="The seed for generation")
     state: GameState = Field(description="The analyzed state of the game")
+    clock: Clock = Field(default_factory=Clock, description="The clock of the game")
     events: list[EventState] = Field(default_factory=list, description="All events in the environment")
+    done: bool = Field(default=False, description="Whether the episode has reached its final step.")
+
+    _rng: random.Random = PrivateAttr()
+    def model_post_init(self, __context) -> None:                                                                 
+          self._rng = random.Random(self.seed)  

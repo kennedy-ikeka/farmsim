@@ -4,7 +4,7 @@ from src.models.action import SellActionState
 def sell(state, action: SellActionState) -> dict:
     """Sell `count` of `item` from the shed into the market at current price."""
     farm = state.farms[state.player]
-    shed = state.private.shed
+    shed = state.privates[state.player].shed
     available = getattr(shed, action.item, 0)
 
     count = min(action.count, available)

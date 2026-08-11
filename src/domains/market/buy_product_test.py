@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.market.buy_product import buy_product
 from src.models.action import BuyProductActionState, PassActionState
 from src.models.environment import StepState
@@ -22,7 +22,7 @@ def test_buy_product_drains_market_costs_money_fills_shed(item):
 
     assert getattr(env.state.market.inventory, item) == 97
     assert farm.money == 925.0
-    assert getattr(env.state.private.shed, item) == 3
+    assert getattr(env.state.privates[0].shed, item) == 3
 
 
 def test_buy_product_adds_to_existing_shed_stock():
@@ -31,11 +31,11 @@ def test_buy_product_adds_to_existing_shed_stock():
     env.state.market.inventory.WHEAT = 100
     env.state.market.prices.WHEAT = 10
     farm.money = 500.0
-    env.state.private.shed.WHEAT = 5
+    env.state.privates[0].shed.WHEAT = 5
 
     buy_product(env.state, BuyProductActionState(type="BUY_PRODUCT", item="WHEAT", count=2))
 
-    assert env.state.private.shed.WHEAT == 7
+    assert env.state.privates[0].shed.WHEAT == 7
     assert env.state.market.inventory.WHEAT == 98
     assert farm.money == 480.0
 
@@ -54,7 +54,7 @@ def test_buy_product_partial_when_count_exceeds_market_supply():
     buy_product(env.state, BuyProductActionState(type="BUY_PRODUCT", item="WHEAT", count=5))
 
     assert env.state.market.inventory.WHEAT == 0  # drained
-    assert env.state.private.shed.WHEAT == 2  # only 2 bought
+    assert env.state.privates[0].shed.WHEAT == 2  # only 2 bought
     assert farm.money == 980.0
 
 
@@ -68,7 +68,7 @@ def test_buy_product_partial_when_count_exceeds_affordability():
     buy_product(env.state, BuyProductActionState(type="BUY_PRODUCT", item="WHEAT", count=5))
 
     assert env.state.market.inventory.WHEAT == 99
-    assert env.state.private.shed.WHEAT == 1
+    assert env.state.privates[0].shed.WHEAT == 1
     assert farm.money == 5.0
 
 
@@ -81,7 +81,7 @@ def test_buy_product_limited_by_both_supply_and_affordability():
 
     buy_product(env.state, BuyProductActionState(type="BUY_PRODUCT", item="WHEAT", count=5))
 
-    assert env.state.private.shed.WHEAT == 1
+    assert env.state.privates[0].shed.WHEAT == 1
     assert farm.money == 5.0
 
 
@@ -98,7 +98,7 @@ def test_buy_product_noop_when_market_empty():
 
     buy_product(env.state, BuyProductActionState(type="BUY_PRODUCT", item="WHEAT", count=1))
 
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
     assert farm.money == 1000.0
 
 
@@ -112,7 +112,7 @@ def test_buy_product_noop_when_no_money():
     buy_product(env.state, BuyProductActionState(type="BUY_PRODUCT", item="WHEAT", count=1))
 
     assert env.state.market.inventory.WHEAT == 100
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
     assert farm.money == 0.0
 
 
@@ -126,7 +126,7 @@ def test_buy_product_noop_when_cannot_afford_one():
     buy_product(env.state, BuyProductActionState(type="BUY_PRODUCT", item="WHEAT", count=1))
 
     assert env.state.market.inventory.WHEAT == 100
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
     assert farm.money == 10.0
 
 
@@ -146,8 +146,8 @@ def test_step_dispatches_buy_product_action():
         hands=[],
         market=[BuyProductActionState(type="BUY_PRODUCT", item="FERTILIZER", count=2)],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert env.state.market.inventory.FERTILIZER == 48
-    assert env.state.private.shed.FERTILIZER == 2
+    assert env.state.privates[0].shed.FERTILIZER == 2
     assert farm.money == 300.0

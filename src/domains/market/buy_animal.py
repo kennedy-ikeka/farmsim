@@ -20,6 +20,6 @@ def buy_animal(state, action: BuyAnimalActionState) -> dict:
         return {"animal": action.animal, "count": 0, "unit_cost": cost, "cost": 0}
 
     farm.money -= count * cost
-    shed = state.private.shed
+    shed = state.privates[state.player].shed
     setattr(shed, action.animal, getattr(shed, action.animal, 0) + count)
     return {"animal": action.animal, "count": count, "unit_cost": cost, "cost": count * cost}

@@ -11,7 +11,7 @@ broader context (`state.private`, `state.day`, `state.step`).
 """
 from src.models.action import FarmActionState
 from src.models.event import EventState
-from src.models.farm import FarmState
+from src.models.farm import AnimalState, FarmState, PlantState, WeedState
 from src.models.game import GameState
 
 from src.domains.farm.build_structure import build_structure
@@ -25,6 +25,8 @@ from src.domains.farm.move import move_unit
 from src.domains.farm.pickup import pickup
 from src.domains.farm.place import place
 from src.domains.farm.plant import plant
+from src.domains.farm.refresh_animal import refresh_animal
+from src.domains.farm.refresh_plant import refresh_plant
 from src.domains.farm.water import water
 
 
@@ -80,3 +82,20 @@ class Farm(FarmState):
             intended=action.model_dump(exclude={"type"}),
             occurred=occurred,
         )
+
+    def refresh_tiles(self, state: GameState) -> None:
+        """Run the per-tile end-of-day refresh across this farm's grid.
+
+        Dispatches each tile in place to the appropriate per-tile refresh:
+        `PlantState` tiles to `refresh_plant` (which may reassign the slot
+        to a `WeedState`), `AnimalState` tiles to `refresh_animal` (which
+        mutates the tile in place), and leaves `None`, `WeedState`, and
+        `LOCKED` tiles untouched.
+        """
+        for r, row in enumerate(self.tiles):
+            for c, tile in enumerate(row):
+                if isinstance(tile, PlantState):
+                    refresh_plant(state, self, r, c, tile)
+                elif isinstance(tile, AnimalState):
+                    refresh_animal(tile)
+                # None, WeedState, and "LOCKED" tiles need no refresh.

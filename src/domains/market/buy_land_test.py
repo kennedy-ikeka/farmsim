@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.market.buy_land import buy_land, QUADRANT_COST
 from src.models.action import BuyLandActionState, PassActionState
 from src.models.environment import StepState
@@ -160,7 +160,7 @@ def test_step_dispatches_buy_land_action():
         hands=[],
         market=[BuyLandActionState(type="BUY_LAND")],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert "NE" in farm.unlocked_quadrants
     assert farm.money == 5000.0 - QUADRANT_COST["NE"]

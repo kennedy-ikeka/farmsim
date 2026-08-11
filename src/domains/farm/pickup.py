@@ -28,7 +28,7 @@ def pickup(state, farm, unit_pos, action: PickupActionState, inv_index: int) -> 
     if not is_shed_adjacent(row, col, rows, cols):
         return {"position": [row, col], "item": action.item, "count": 0}
 
-    shed = state.private.shed
+    shed = state.privates[state.player].shed
     item = action.item
     if item not in type(shed).model_fields:
         return {"position": [row, col], "item": item, "count": 0}  # not a valid shed item

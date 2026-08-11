@@ -20,6 +20,6 @@ def buy_seed(state, action: BuySeedActionState) -> dict:
         return {"crop": action.crop, "count": 0, "unit_cost": seed_cost, "cost": 0}
 
     farm.money -= count * seed_cost
-    seeds = state.private.seeds
+    seeds = state.privates[state.player].seeds
     setattr(seeds, action.crop, getattr(seeds, action.crop, 0) + count)
     return {"crop": action.crop, "count": count, "unit_cost": seed_cost, "cost": count * seed_cost}

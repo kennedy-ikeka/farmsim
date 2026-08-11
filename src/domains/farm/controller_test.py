@@ -73,7 +73,7 @@ def test_apply_plant_dispatches():
     farm.apply(env.state, [4, 4], PlantActionState(type="PLANT", crop="WHEAT"), 0)
     assert isinstance(farm.tiles[4][4], PlantState)
     assert farm.tiles[4][4].crop == "WHEAT"
-    assert env.state.private.seeds.WHEAT == 2
+    assert env.state.privates[0].seeds.WHEAT == 2
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ def test_apply_harvest_dispatches():
     env.state.day = 13
     farm.apply(env.state, [4, 4], HarvestActionState(type="HARVEST"), 0)
     assert farm.tiles[4][4] is None  # one-time crop consumed
-    assert env.state.private.shed.WHEAT == 5
+    assert env.state.privates[0].shed.WHEAT == 5
 
 
 # ---------------------------------------------------------------------------
@@ -113,10 +113,10 @@ def test_apply_fertilize_dispatches():
     env = _make_env(farmer=(4, 4), seeds={"WHEAT": 1}, day=2)
     farm = env.state.farms[0]
     farm.apply(env.state, [4, 4], PlantActionState(type="PLANT", crop="WHEAT"), 0)
-    env.state.private.shed.FERTILIZER = 1
+    env.state.privates[0].shed.FERTILIZER = 1
     farm.apply(env.state, [4, 4], FertilizeActionState(type="FERTILIZE"), 0)
     assert farm.tiles[4][4].fertilized_until_day == 2 + 3
-    assert env.state.private.shed.FERTILIZER == 0
+    assert env.state.privates[0].shed.FERTILIZER == 0
 
 
 # ---------------------------------------------------------------------------
@@ -159,10 +159,10 @@ def test_apply_feed_dispatches():
     env = _make_env(farmer=(4, 4))
     farm = env.state.farms[0]
     farm.tiles[4][4] = AnimalState(kind="COOP", animal="GOOSE")
-    env.state.private.shed.WHEAT = 1
+    env.state.privates[0].shed.WHEAT = 1
     farm.apply(env.state, [4, 4], FeedActionState(type="FEED"), 0)
     assert farm.tiles[4][4].fed_today is True
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ def test_apply_collect_fertilizer_dispatches():
     farm.tiles[4][4] = AnimalState(kind="COOP", animal="GOOSE", fertilizer_available=1)
     farm.apply(env.state, [4, 4], CollectFertilizerActionState(type="COLLECT_FERTILIZER"), 0)
     assert farm.tiles[4][4].fertilizer_available == 0
-    assert env.state.private.shed.FERTILIZER == 1
+    assert env.state.privates[0].shed.FERTILIZER == 1
 
 
 # ---------------------------------------------------------------------------
@@ -198,10 +198,10 @@ def test_apply_pickup_dispatches():
     # (4,4) is a shed-adjacent center tile for a 10x10 board (half=5).
     env = _make_env(farmer=(4, 4))
     farm = env.state.farms[0]
-    env.state.private.shed.WHEAT = 2
+    env.state.privates[0].shed.WHEAT = 2
     farm.apply(env.state, [4, 4], PickupActionState(type="PICKUP", item="WHEAT", count=1), 0)
-    assert env.state.private.shed.WHEAT == 1
-    assert env.state.private.inventories[0]["WHEAT"] == 1
+    assert env.state.privates[0].shed.WHEAT == 1
+    assert env.state.privates[0].inventories[0]["WHEAT"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -212,11 +212,11 @@ def test_apply_place_dispatches():
     # Drop an item back into the shed from the farmer's inventory.
     env = _make_env(farmer=(4, 4))
     farm = env.state.farms[0]
-    env.state.private.inventories = [{"WHEAT": 1}]
-    env.state.private.shed.WHEAT = 0
+    env.state.privates[0].inventories = [{"WHEAT": 1}]
+    env.state.privates[0].shed.WHEAT = 0
     farm.apply(env.state, [4, 4], PlaceActionState(type="PLACE", item="WHEAT", count=1), 0)
-    assert env.state.private.shed.WHEAT == 1
-    assert env.state.private.inventories[0]["WHEAT"] == 0
+    assert env.state.privates[0].shed.WHEAT == 1
+    assert env.state.privates[0].inventories[0]["WHEAT"] == 0
 
 
 # ---------------------------------------------------------------------------

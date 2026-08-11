@@ -33,8 +33,8 @@ class GameState(BaseModel):
         description="All farms belonging to the players in the game."
     )
 
-    private: PrivateState = Field(
-        description="Private state and resources belonging to the current player."
+    privates: list[PrivateState] = Field(
+        description="Per-player private state, indexed by player id."
     )
 
     market: MarketState = Field(
@@ -44,9 +44,3 @@ class GameState(BaseModel):
     town: TownState = Field(
         description="Current state of the town and its available shops."
     )
-
-
-class Reality(BaseModel):
-    """The deduced reality from the observation"""
-
-    observation: GameState = Field(description="The original observation")

@@ -31,7 +31,7 @@ def feed(state, farm, unit_pos, action) -> dict:
     if tile.fed_today:
         return {"position": [row, col], "animal": tile.animal, "fed": False}  # only once per day
 
-    shed = state.private.shed
+    shed = state.privates[state.player].shed
     if shed.WHEAT <= 0:
         return {"position": [row, col], "animal": tile.animal, "fed": False}
 

@@ -29,7 +29,7 @@ def fertilize(state, farm, unit_pos, action: FertilizeActionState) -> dict:
     if not isinstance(tile, PlantState):
         return {"position": [row, col], "fertilized": False}
 
-    shed = state.private.shed
+    shed = state.privates[state.player].shed
     if shed.FERTILIZER <= 0:
         return {"position": [row, col], "fertilized": False}
 

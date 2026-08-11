@@ -27,6 +27,6 @@ def buy_product(state, action: BuyProductActionState) -> dict:
 
     setattr(state.market.inventory, item, available - count)
     farm.money -= count * price
-    shed = state.private.shed
+    shed = state.privates[state.player].shed
     setattr(shed, item, getattr(shed, item, 0) + count)
     return {"item": item, "count": count, "price": price, "cost": count * price}

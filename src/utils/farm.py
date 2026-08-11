@@ -13,7 +13,7 @@ def is_shed_adjacent(row, col, rows, cols):
 def ensure_inventory(state, inv_index):
     """Return the unit's inventory dict, padding the inventories list with
     empty dicts up to (and including) `inv_index` if needed."""
-    inventories = state.private.inventories
+    inventories = state.privates[state.player].inventories
     while len(inventories) <= inv_index:
         inventories.append({})
     return inventories[inv_index]

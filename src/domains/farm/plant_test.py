@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.farm.plant import plant
 from src.models.crops import CROP_CONFIG, TURNS_PER_DAY
 from src.models.action import PlantActionState
@@ -21,7 +21,7 @@ def _seed_tile():
 def test_plant_consumes_one_seed_and_writes_plant_dict(crop):
     env = _make_env(farmer=(5, 5), seeds={crop: 3})
     farm = env.state.farms[0]
-    seeds = env.state.private.seeds
+    seeds = env.state.privates[0].seeds
 
     plant(env.state, farm, farm.farmer, PlantActionState(type="PLANT", crop=crop))
 
@@ -68,15 +68,15 @@ def test_plant_only_consumes_one_seed_even_with_many():
     env = _make_env(farmer=(5, 5), seeds={"WHEAT": 10})
     farm = env.state.farms[0]
     plant(env.state, farm, farm.farmer, PlantActionState(type="PLANT", crop="WHEAT"))
-    assert env.state.private.seeds.WHEAT == 9
+    assert env.state.privates[0].seeds.WHEAT == 9
 
 
 def test_plant_does_not_touch_other_crops_seeds():
     env = _make_env(farmer=(5, 5), seeds={"WHEAT": 2, "CARROT": 5})
     farm = env.state.farms[0]
     plant(env.state, farm, farm.farmer, PlantActionState(type="PLANT", crop="WHEAT"))
-    assert env.state.private.seeds.WHEAT == 1
-    assert env.state.private.seeds.CARROT == 5  # untouched
+    assert env.state.privates[0].seeds.WHEAT == 1
+    assert env.state.privates[0].seeds.CARROT == 5  # untouched
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ def test_plant_noop_on_locked_tile():
     farm = env.state.farms[0]
     plant(env.state, farm, farm.farmer, PlantActionState(type="PLANT", crop="WHEAT"))
     assert farm.tiles[5][5] == "LOCKED"  # unchanged
-    assert env.state.private.seeds.WHEAT == 2  # seed not consumed
+    assert env.state.privates[0].seeds.WHEAT == 2  # seed not consumed
 
 
 def test_plant_noop_on_occupied_tile():
@@ -100,7 +100,7 @@ def test_plant_noop_on_occupied_tile():
     farm.tiles[5][5] = PlantState(crop="CARROT", planted_day=0, max_lifespan_step=0)
     plant(env.state, farm, farm.farmer, PlantActionState(type="PLANT", crop="WHEAT"))
     assert farm.tiles[5][5].crop == "CARROT"  # original plant preserved
-    assert env.state.private.seeds.WHEAT == 2  # seed not consumed
+    assert env.state.privates[0].seeds.WHEAT == 2  # seed not consumed
 
 
 def test_plant_noop_when_no_seeds():
@@ -108,7 +108,7 @@ def test_plant_noop_when_no_seeds():
     farm = env.state.farms[0]
     plant(env.state, farm, farm.farmer, PlantActionState(type="PLANT", crop="WHEAT"))
     assert farm.tiles[5][5] is None  # nothing planted
-    assert env.state.private.seeds.WHEAT == 0
+    assert env.state.privates[0].seeds.WHEAT == 0
 
 
 def test_plant_noop_on_weed_tile():
@@ -117,7 +117,7 @@ def test_plant_noop_on_weed_tile():
     farm.tiles[5][5] = WeedState()  # pre-place a weed via direct mutation
     plant(env.state, farm, farm.farmer, PlantActionState(type="PLANT", crop="WHEAT"))
     assert isinstance(farm.tiles[5][5], WeedState)
-    assert env.state.private.seeds.WHEAT == 2
+    assert env.state.privates[0].seeds.WHEAT == 2
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ def test_plant_noop_on_malformed_or_negative_position(bad_pos):
     farm = env.state.farms[0]
     pos = list(bad_pos) if isinstance(bad_pos, tuple) else bad_pos
     plant(env.state, farm, pos, PlantActionState(type="PLANT", crop="WHEAT"))
-    assert env.state.private.seeds.WHEAT == 2  # nothing consumed
+    assert env.state.privates[0].seeds.WHEAT == 2  # nothing consumed
 
 
 def test_plant_noop_out_of_bounds():
@@ -141,7 +141,7 @@ def test_plant_noop_out_of_bounds():
     # nothing planted anywhere
     for row in farm.tiles:
         assert all(t is None for t in row)
-    assert env.state.private.seeds.WHEAT == 2
+    assert env.state.privates[0].seeds.WHEAT == 2
 
 
 # ---------------------------------------------------------------------------
@@ -155,10 +155,10 @@ def test_step_dispatches_plant_action():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
     tile = env.state.farms[0].tiles[3][3]
     assert isinstance(tile, PlantState) and tile.kind == "PLANT"
-    assert env.state.private.seeds.WHEAT == 0
+    assert env.state.privates[0].seeds.WHEAT == 0
 
 
 def test_step_plant_noop_does_not_consume_seed_when_locked():
@@ -170,9 +170,9 @@ def test_step_plant_noop_does_not_consume_seed_when_locked():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
     assert env.state.farms[0].tiles[5][5] == "LOCKED"
-    assert env.state.private.seeds.WHEAT == 1  # not consumed
+    assert env.state.privates[0].seeds.WHEAT == 1  # not consumed
 
 
 # ---------------------------------------------------------------------------

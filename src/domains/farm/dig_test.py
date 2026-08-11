@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.farm.dig import dig
 from src.models.action import DigActionState
 from src.models.environment import StepState
@@ -95,12 +95,12 @@ def test_dig_plant_does_not_yield_produce():
     farm.tiles[5][5] = PlantState(
         crop="WHEAT", planted_day=0, max_lifespan_step=120, yield_units=4
     )
-    env.state.private.shed.WHEAT = 0
+    env.state.privates[0].shed.WHEAT = 0
 
     dig(farm, farm.farmer, DigActionState(type="DIG"))
 
     assert farm.tiles[5][5] is None
-    assert env.state.private.shed.WHEAT == 0  # no produce from digging
+    assert env.state.privates[0].shed.WHEAT == 0  # no produce from digging
 
 
 def test_dig_does_not_touch_other_tiles():
@@ -153,7 +153,7 @@ def test_step_dispatches_dig_action_on_plant():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert env.state.farms[0].tiles[3][3] is None
 
@@ -168,7 +168,7 @@ def test_step_dispatches_dig_action_on_weed():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert env.state.farms[0].tiles[3][3] is None
 
@@ -183,7 +183,7 @@ def test_step_dig_noop_on_structure_with_animal():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     tile = env.state.farms[0].tiles[3][3]
     assert isinstance(tile, AnimalState)

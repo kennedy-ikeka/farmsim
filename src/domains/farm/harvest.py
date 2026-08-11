@@ -40,7 +40,7 @@ def harvest(state, farm, unit_pos, action: HarvestActionState) -> dict:
     if yield_units <= 0:
         return {"position": [row, col], "crop": tile.crop, "yield": 0}  # nothing to harvest
 
-    shed = state.private.shed
+    shed = state.privates[state.player].shed
     current = getattr(shed, tile.crop, 0)
     setattr(shed, tile.crop, current + yield_units)
 

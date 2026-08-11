@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.farm.care import care
 from src.models.action import CareActionState
 from src.models.environment import StepState
@@ -97,6 +97,6 @@ def test_step_dispatches_care():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert env.state.farms[0].tiles[3][3].cared_today is True

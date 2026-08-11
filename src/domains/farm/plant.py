@@ -28,7 +28,7 @@ def plant(state, farm, unit_pos, action: PlantActionState) -> dict:
     if farm.tiles[row][col] is not None:
         return {"crop": action.crop, "position": [row, col], "planted": False}
 
-    seeds = state.private.seeds
+    seeds = state.privates[state.player].seeds
     available = getattr(seeds, action.crop, 0)
     if available <= 0:
         return {"crop": action.crop, "position": [row, col], "planted": False}

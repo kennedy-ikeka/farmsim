@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.farm.water import water
 from src.models.crops import CROP_CONFIG
 from src.models.action import WaterActionState
@@ -261,7 +261,7 @@ def test_step_dispatches_water_action():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     tile = env.state.farms[0].tiles[3][3]
     assert tile.watered_today is True

@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.market.hire import hire, _fib
 from src.models.action import HireActionState, PassActionState
 from src.models.environment import StepState
@@ -139,7 +139,7 @@ def test_step_dispatches_hire_action():
         hands=[],
         market=[HireActionState(type="HIRE")],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert farm.hires_today == 1
     assert len(farm.hands) == 1

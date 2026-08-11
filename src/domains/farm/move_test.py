@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.farm.move import _MOVE_DELTAS, move_unit
 from src.models.action import MoveActionState, PassActionState
 from src.models.environment import StepState
@@ -182,21 +182,21 @@ def test_move_unit_ignores_unknown_direction():
 def test_step_dispatches_move_action_to_farmer(direction, expected):
     env = _make_env(farmer=(5, 5))
     step = StepState(farmer=MoveActionState(type=direction), hands=[], market=[])
-    env.step(step)
+    env.step(_turn(step))
     assert env.state.farms[0].farmer == expected
 
 
 def test_step_pass_leaves_farmer_in_place():
     env = _make_env(farmer=(5, 5))
     step = StepState(farmer=PassActionState(type="PASS"), hands=[], market=[])
-    env.step(step)
+    env.step(_turn(step))
     assert env.state.farms[0].farmer == [5, 5]
 
 
 def test_step_clamps_farmer_at_edge():
     env = _make_env(farmer=(0, 0))
     step = StepState(farmer=MoveActionState(type="NORTH"), hands=[], market=[])
-    env.step(step)
+    env.step(_turn(step))
     assert env.state.farms[0].farmer == [0, 0]
 
 

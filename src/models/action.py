@@ -12,6 +12,10 @@ MOVE_ACTIONS = Literal['NORTH', 'SOUTH', 'EAST', 'WEST']
 INVENTORY_ACTIONS = Literal['PICKUP', 'PLACE']
 MARKET_ACTIONS = Literal['BUY_SEED', 'BUY_PRODUCT', 'BUY_ANIMAL', 'SELL', 'HIRE', 'BUY_LAND']
 ANIMAL_ACTIONS = Literal["BUILD_COOP", "BUILD_PASTURE", "FEED", "COLLECT_FERTILIZER", "CARE"]
+# Town events are environment-driven (not player actions): a shop unlocking, an
+# unlocked shop consuming market inventory, or the town center consuming market
+# inventory on its tick. Recorded as EventState with player=-1.
+TOWN_ACTIONS = Literal["SHOP_UNLOCK", "SHOP_CONSUME", "CENTER_CONSUME"]
 
 class BaseAction(BaseModel, Generic[T]):
     """Base action model. The `type` field is generic so subclasses can

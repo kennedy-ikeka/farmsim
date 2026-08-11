@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.farm.harvest import harvest
 from src.models.crops import CROP_CONFIG
 from src.models.action import HarvestActionState
@@ -37,31 +37,31 @@ def test_harvest_one_time_crop_deposits_yield_and_clears_tile(crop, day, yield_u
     harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
 
     assert farm.tiles[5][5] is None  # plant consumed
-    assert getattr(env.state.private.shed, crop) == yield_units
+    assert getattr(env.state.privates[0].shed, crop) == yield_units
 
 
 def test_harvest_one_time_crop_adds_to_existing_shed_stock():
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
     farm.tiles[5][5] = _plant_on_tile(crop="WHEAT", planted_day=0, yield_units=2)
-    env.state.private.shed.WHEAT = 5
+    env.state.privates[0].shed.WHEAT = 5
 
     harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
 
     assert farm.tiles[5][5] is None
-    assert env.state.private.shed.WHEAT == 7
+    assert env.state.privates[0].shed.WHEAT == 7
 
 
 def test_harvest_does_not_touch_other_shed_slots():
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
     farm.tiles[5][5] = _plant_on_tile(crop="WHEAT", planted_day=0, yield_units=2)
-    env.state.private.shed.CARROT = 4
+    env.state.privates[0].shed.CARROT = 4
 
     harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
 
-    assert env.state.private.shed.WHEAT == 2
-    assert env.state.private.shed.CARROT == 4  # untouched
+    assert env.state.privates[0].shed.WHEAT == 2
+    assert env.state.privates[0].shed.CARROT == 4  # untouched
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ def test_harvest_ongoing_crop_deposits_yield_and_keeps_plant(crop, day):
     assert isinstance(tile, PlantState)
     assert tile.crop == crop
     assert tile.yield_units == 0  # reset for next scheduled yield
-    assert getattr(env.state.private.shed, crop) == 3
+    assert getattr(env.state.privates[0].shed, crop) == 3
 
 
 def test_harvest_ongoing_crop_can_harvest_again_later():
@@ -93,14 +93,14 @@ def test_harvest_ongoing_crop_can_harvest_again_later():
     farm.tiles[5][5] = _plant_on_tile(crop="TOMATO", planted_day=0, yield_units=2)
 
     harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
-    assert env.state.private.shed.TOMATO == 2
+    assert env.state.privates[0].shed.TOMATO == 2
     assert farm.tiles[5][5].yield_units == 0
 
     # Later, more yield accumulates.
     farm.tiles[5][5].yield_units = 2
     env.state.day = 9
     harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
-    assert env.state.private.shed.TOMATO == 4
+    assert env.state.privates[0].shed.TOMATO == 4
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ def test_harvest_before_first_yield_day_is_noop(crop, day):
     tile = farm.tiles[5][5]
     assert isinstance(tile, PlantState)
     assert tile.yield_units == 2  # untouched
-    assert getattr(env.state.private.shed, crop) == 0
+    assert getattr(env.state.privates[0].shed, crop) == 0
 
 
 def test_harvest_melon_with_yield_before_first_yield_day_is_noop():
@@ -140,7 +140,7 @@ def test_harvest_melon_with_yield_before_first_yield_day_is_noop():
     tile = farm.tiles[5][5]
     assert isinstance(tile, PlantState)
     assert tile.yield_units == 2
-    assert env.state.private.shed.MELON == 0
+    assert env.state.privates[0].shed.MELON == 0
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ def test_harvest_one_time_crop_with_zero_yield_is_noop():
 
     tile = farm.tiles[5][5]
     assert isinstance(tile, PlantState)  # plant not consumed
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
 
 
 def test_harvest_ongoing_crop_with_zero_yield_is_noop():
@@ -169,7 +169,7 @@ def test_harvest_ongoing_crop_with_zero_yield_is_noop():
     tile = farm.tiles[5][5]
     assert isinstance(tile, PlantState)
     assert tile.yield_units == 0
-    assert env.state.private.shed.TOMATO == 0
+    assert env.state.privates[0].shed.TOMATO == 0
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ def test_harvest_noop_on_empty_tile():
     farm = env.state.farms[0]
     harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
     assert farm.tiles[5][5] is None
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
 
 
 def test_harvest_noop_on_locked_tile():
@@ -199,7 +199,7 @@ def test_harvest_noop_on_weed_tile():
     farm.tiles[5][5] = WeedState()
     harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
     assert isinstance(farm.tiles[5][5], WeedState)
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
 
 
 def test_harvest_noop_on_animal_structure():
@@ -222,7 +222,7 @@ def test_harvest_noop_on_malformed_or_negative_position(bad_pos):
     pos = list(bad_pos) if isinstance(bad_pos, tuple) else bad_pos
     harvest(env.state, farm, pos, HarvestActionState(type="HARVEST"))
     assert farm.tiles[5][5].yield_units == 2
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
 
 
 def test_harvest_noop_out_of_bounds():
@@ -231,7 +231,7 @@ def test_harvest_noop_out_of_bounds():
     farm.tiles[4][4] = _plant_on_tile(crop="WHEAT", planted_day=0, yield_units=2)
     harvest(env.state, farm, [5, 0], HarvestActionState(type="HARVEST"))
     assert farm.tiles[4][4].yield_units == 2
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
 
 
 # ---------------------------------------------------------------------------
@@ -248,10 +248,10 @@ def test_step_dispatches_harvest_action():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert env.state.farms[0].tiles[3][3] is None
-    assert env.state.private.shed.WHEAT == 2
+    assert env.state.privates[0].shed.WHEAT == 2
 
 
 def test_step_harvest_noop_before_maturity_does_not_consume_plant():
@@ -264,12 +264,12 @@ def test_step_harvest_noop_before_maturity_does_not_consume_plant():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     tile = env.state.farms[0].tiles[3][3]
     assert isinstance(tile, PlantState)
     assert tile.yield_units == 2
-    assert env.state.private.shed.WHEAT == 0
+    assert env.state.privates[0].shed.WHEAT == 0
 
 
 # ---------------------------------------------------------------------------

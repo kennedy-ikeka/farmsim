@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.market.buy_animal import buy_animal
 from src.models.animals import ANIMAL_CONFIG
 from src.models.action import BuyAnimalActionState, PassActionState
@@ -16,7 +16,7 @@ def test_buy_animal_consumes_money_and_adds_to_shed(animal):
 
     buy_animal(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal=animal, count=2))
 
-    assert getattr(env.state.private.shed, animal) == 2
+    assert getattr(env.state.privates[0].shed, animal) == 2
     assert farm.money == 5000.0 - 2 * cost
 
 
@@ -37,22 +37,22 @@ def test_buy_animal_adds_to_existing_shed_stock():
     env = _make_env()
     farm = env.state.farms[0]
     farm.money = 5000.0
-    env.state.private.shed.GOOSE = 1
+    env.state.privates[0].shed.GOOSE = 1
 
     buy_animal(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=2))
 
-    assert env.state.private.shed.GOOSE == 3
+    assert env.state.privates[0].shed.GOOSE == 3
 
 
 def test_buy_animal_does_not_touch_other_shed_animals():
     env = _make_env()
     farm = env.state.farms[0]
     farm.money = 5000.0
-    env.state.private.shed.COW = 3
+    env.state.privates[0].shed.COW = 3
 
     buy_animal(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=1))
 
-    assert env.state.private.shed.COW == 3  # untouched
+    assert env.state.privates[0].shed.COW == 3  # untouched
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ def test_buy_animal_partial_when_cannot_afford_all():
 
     buy_animal(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=5))
 
-    assert env.state.private.shed.GOOSE == 2
+    assert env.state.privates[0].shed.GOOSE == 2
     assert farm.money == 100.0  # 700 - 2*300
 
 
@@ -78,7 +78,7 @@ def test_buy_animal_noop_when_cannot_afford_any():
 
     buy_animal(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=1))
 
-    assert env.state.private.shed.GOOSE == 0
+    assert env.state.privates[0].shed.GOOSE == 0
     assert farm.money == 200.0
 
 
@@ -89,7 +89,7 @@ def test_buy_animal_noop_when_zero_money():
 
     buy_animal(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal="COW", count=1))
 
-    assert env.state.private.shed.COW == 0
+    assert env.state.privates[0].shed.COW == 0
     assert farm.money == 0.0
 
 
@@ -107,7 +107,7 @@ def test_step_dispatches_buy_animal_action():
         hands=[],
         market=[BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=2)],
     )
-    env.step(step)
+    env.step(_turn(step))
 
-    assert env.state.private.shed.GOOSE == 2
+    assert env.state.privates[0].shed.GOOSE == 2
     assert farm.money == 1000.0 - 2 * ANIMAL_CONFIG["GOOSE"]["cost"]

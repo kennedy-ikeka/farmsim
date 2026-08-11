@@ -9,13 +9,15 @@ from src.models.action import (
     MOVE_ACTIONS,
     PLANT_ACTIONS,
     TERRAIN_ACTIONS,
-    ANIMAL_ACTIONS
+    ANIMAL_ACTIONS,
+    TOWN_ACTIONS,
 )
 
 # Every action that can be performed during a step is an event. The grouped
 # action literals (PLANT_ACTIONS, MOVE_ACTIONS, etc.) are reused so this stays
 # in sync with the action model; the animal-structure and care actions and the
 # PASS no-op live only as individual Literal tags on their action classes.
+# TOWN_ACTIONS covers environment-driven town events (no player action).
 EVENT_TYPES = Union[
     MOVE_ACTIONS,
     PLANT_ACTIONS,
@@ -23,6 +25,7 @@ EVENT_TYPES = Union[
     INVENTORY_ACTIONS,
     ANIMAL_ACTIONS,
     MARKET_ACTIONS,
+    TOWN_ACTIONS,
     Literal["PASS"],
 ]
 

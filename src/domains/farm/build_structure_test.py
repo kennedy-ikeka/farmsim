@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.farm.build_structure import build_structure
 from src.models.action import BuildCoopActionState, BuildPastureActionState
 from src.models.environment import StepState
@@ -87,7 +87,7 @@ def test_step_dispatches_build_coop():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
     tile = env.state.farms[0].tiles[3][3]
     assert isinstance(tile, AnimalState)
     assert tile.kind == "COOP"
@@ -101,7 +101,7 @@ def test_step_dispatches_build_pasture():
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
     tile = env.state.farms[0].tiles[3][3]
     assert isinstance(tile, AnimalState)
     assert tile.kind == "PASTURE"

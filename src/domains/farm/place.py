@@ -56,7 +56,7 @@ def place(state, farm, unit_pos, action: PlaceActionState, inv_index: int) -> di
     if not is_shed_adjacent(row, col, rows, cols):
         return {"position": [row, col], "item": item, "count": 0, "mode": None}
 
-    shed = state.private.shed
+    shed = state.privates[state.player].shed
     if item not in type(shed).model_fields:
         return {"position": [row, col], "item": item, "count": 0, "mode": None}  # not a valid shed item
 

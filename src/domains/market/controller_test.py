@@ -33,10 +33,10 @@ def test_market_in_state_is_market_controller():
 def test_apply_sell_dispatches():
     env = _make_env()
     farm = env.state.farms[0]
-    env.state.private.shed.WHEAT = 3
+    env.state.privates[0].shed.WHEAT = 3
     env.state.market.prices.WHEAT = 10
     env.state.market.apply(env.state, SellActionState(type="SELL", item="WHEAT", count=2))
-    assert env.state.private.shed.WHEAT == 1
+    assert env.state.privates[0].shed.WHEAT == 1
     assert env.state.market.inventory.WHEAT == 2
     assert farm.money == 20.0
 
@@ -50,7 +50,7 @@ def test_apply_buy_seed_dispatches():
     farm = env.state.farms[0]
     farm.money = 100.0
     env.state.market.apply(env.state, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=2))
-    assert env.state.private.seeds.WHEAT == 2
+    assert env.state.privates[0].seeds.WHEAT == 2
     assert farm.money < 100.0  # money was spent
 
 
@@ -66,7 +66,7 @@ def test_apply_buy_product_dispatches():
     farm.money = 500.0
     env.state.market.apply(env.state, BuyProductActionState(type="BUY_PRODUCT", item="FERTILIZER", count=2))
     assert env.state.market.inventory.FERTILIZER == 48
-    assert env.state.private.shed.FERTILIZER == 2
+    assert env.state.privates[0].shed.FERTILIZER == 2
     assert farm.money == 300.0
 
 
@@ -79,7 +79,7 @@ def test_apply_buy_animal_dispatches():
     farm = env.state.farms[0]
     farm.money = 1000.0
     env.state.market.apply(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=2))
-    assert env.state.private.shed.GOOSE == 2
+    assert env.state.privates[0].shed.GOOSE == 2
     assert farm.money == 1000.0 - 2 * ANIMAL_CONFIG["GOOSE"]["cost"]
 
 

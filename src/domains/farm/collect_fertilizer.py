@@ -34,5 +34,5 @@ def collect_fertilizer(state, farm, unit_pos, action) -> dict:
         return {"position": [row, col], "animal": tile.animal, "collected": 0}
 
     tile.fertilizer_available = 0
-    state.private.shed.FERTILIZER += 1
+    state.privates[state.player].shed.FERTILIZER += 1
     return {"position": [row, col], "animal": tile.animal, "collected": 1}

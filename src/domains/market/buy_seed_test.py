@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.market.buy_seed import buy_seed
 from src.models.crops import CROP_CONFIG
 from src.models.action import BuySeedActionState, PassActionState
@@ -17,18 +17,18 @@ def test_buy_seed_consumes_money_and_adds_seeds(crop):
     buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop=crop, count=3))
 
     assert farm.money == 1000.0 - 3 * cost
-    assert getattr(env.state.private.seeds, crop) == 3
+    assert getattr(env.state.privates[0].seeds, crop) == 3
 
 
 def test_buy_seed_adds_to_existing_seed_stock():
     env = _make_env()
     farm = env.state.farms[0]
     farm.money = 1000.0
-    env.state.private.seeds.WHEAT = 2
+    env.state.privates[0].seeds.WHEAT = 2
 
     buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=3))
 
-    assert env.state.private.seeds.WHEAT == 5
+    assert env.state.privates[0].seeds.WHEAT == 5
     assert farm.money == 1000.0 - 3 * CROP_CONFIG["WHEAT"]["seed_cost"]
 
 
@@ -36,12 +36,12 @@ def test_buy_seed_does_not_touch_other_crops_seeds():
     env = _make_env()
     farm = env.state.farms[0]
     farm.money = 1000.0
-    env.state.private.seeds.CARROT = 5
+    env.state.privates[0].seeds.CARROT = 5
 
     buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=2))
 
-    assert env.state.private.seeds.CARROT == 5  # untouched
-    assert env.state.private.seeds.WHEAT == 2
+    assert env.state.privates[0].seeds.CARROT == 5  # untouched
+    assert env.state.privates[0].seeds.WHEAT == 2
 
 
 @pytest.mark.parametrize("crop, expected_cost", [
@@ -70,7 +70,7 @@ def test_buy_seed_partial_fulfillment_when_cannot_afford_all():
 
     buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=5))
 
-    assert env.state.private.seeds.WHEAT == 2  # only 2 affordable
+    assert env.state.privates[0].seeds.WHEAT == 2  # only 2 affordable
     assert farm.money == 5.0  # 25 - 2*10 = 5
 
 
@@ -81,7 +81,7 @@ def test_buy_seed_exact_money_buys_all():
 
     buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=3))
 
-    assert env.state.private.seeds.WHEAT == 3
+    assert env.state.privates[0].seeds.WHEAT == 3
     assert farm.money == 0.0
 
 
@@ -92,7 +92,7 @@ def test_buy_seed_noop_when_cannot_afford_any():
 
     buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1))
 
-    assert env.state.private.seeds.WHEAT == 0
+    assert env.state.privates[0].seeds.WHEAT == 0
     assert farm.money == 5.0  # unchanged
 
 
@@ -103,7 +103,7 @@ def test_buy_seed_noop_when_zero_money():
 
     buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1))
 
-    assert env.state.private.seeds.WHEAT == 0
+    assert env.state.privates[0].seeds.WHEAT == 0
     assert farm.money == 0.0
 
 
@@ -121,9 +121,9 @@ def test_step_dispatches_buy_seed_action():
         hands=[],
         market=[BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=4)],
     )
-    env.step(step)
+    env.step(_turn(step))
 
-    assert env.state.private.seeds.WHEAT == 4
+    assert env.state.privates[0].seeds.WHEAT == 4
     assert farm.money == 500.0 - 4 * CROP_CONFIG["WHEAT"]["seed_cost"]
 
 
@@ -137,7 +137,7 @@ def test_step_buy_seed_noop_when_broke_does_not_add_seeds():
         hands=[],
         market=[BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1)],
     )
-    env.step(step)
+    env.step(_turn(step))
 
-    assert env.state.private.seeds.WHEAT == 0
+    assert env.state.privates[0].seeds.WHEAT == 0
     assert farm.money == 0.0

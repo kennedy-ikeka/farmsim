@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures import _make_env
+from tests.fixtures import _make_env, _turn
 from src.domains.farm.fertilize import fertilize
 from src.domains.farm.water import water
 from src.models.action import FertilizeActionState, WaterActionState
@@ -28,13 +28,13 @@ def test_fertilize_consumes_one_fertilizer_and_sets_window(crop):
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
     farm.tiles[5][5] = _plant_on_tile(crop=crop)
-    env.state.private.shed.FERTILIZER = 5
+    env.state.privates[0].shed.FERTILIZER = 5
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
     tile = farm.tiles[5][5]
     assert tile.fertilized_until_day == 6  # day + 3
-    assert env.state.private.shed.FERTILIZER == 4
+    assert env.state.privates[0].shed.FERTILIZER == 4
 
 
 @pytest.mark.parametrize("day, expected_until", [
@@ -44,7 +44,7 @@ def test_fertilize_window_offsets_from_current_day(day, expected_until):
     env = _make_env(farmer=(5, 5), day=day)
     farm = env.state.farms[0]
     farm.tiles[5][5] = _plant_on_tile()
-    env.state.private.shed.FERTILIZER = 1
+    env.state.privates[0].shed.FERTILIZER = 1
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
@@ -55,11 +55,11 @@ def test_fertilize_with_one_fertilizer_consumes_it_to_zero():
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
     farm.tiles[5][5] = _plant_on_tile()
-    env.state.private.shed.FERTILIZER = 1
+    env.state.privates[0].shed.FERTILIZER = 1
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
-    assert env.state.private.shed.FERTILIZER == 0
+    assert env.state.privates[0].shed.FERTILIZER == 0
     assert farm.tiles[5][5].fertilized_until_day == 6
 
 
@@ -72,12 +72,12 @@ def test_fertilize_refreshes_window_when_already_fertilized():
     farm = env.state.farms[0]
     # Previously fertilized at day 5 -> until day 8; still active at day 7.
     farm.tiles[5][5] = _plant_on_tile(fertilized_until_day=8)
-    env.state.private.shed.FERTILIZER = 2
+    env.state.privates[0].shed.FERTILIZER = 2
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
     assert farm.tiles[5][5].fertilized_until_day == 10  # refreshed to day 7 + 3
-    assert env.state.private.shed.FERTILIZER == 1
+    assert env.state.privates[0].shed.FERTILIZER == 1
 
 
 def test_fertilize_refreshes_window_after_expiry():
@@ -85,12 +85,12 @@ def test_fertilize_refreshes_window_after_expiry():
     farm = env.state.farms[0]
     # Fertilization expired at day 8; now day 9.
     farm.tiles[5][5] = _plant_on_tile(fertilized_until_day=8)
-    env.state.private.shed.FERTILIZER = 1
+    env.state.privates[0].shed.FERTILIZER = 1
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
     assert farm.tiles[5][5].fertilized_until_day == 12
-    assert env.state.private.shed.FERTILIZER == 0
+    assert env.state.privates[0].shed.FERTILIZER == 0
 
 
 # ---------------------------------------------------------------------------
@@ -100,12 +100,12 @@ def test_fertilize_refreshes_window_after_expiry():
 def test_fertilize_noop_on_empty_tile():
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
-    env.state.private.shed.FERTILIZER = 2
+    env.state.privates[0].shed.FERTILIZER = 2
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
     assert farm.tiles[5][5] is None
-    assert env.state.private.shed.FERTILIZER == 2  # not consumed
+    assert env.state.privates[0].shed.FERTILIZER == 2  # not consumed
 
 
 def test_fertilize_noop_on_locked_tile():
@@ -113,48 +113,48 @@ def test_fertilize_noop_on_locked_tile():
     tiles[5][5] = "LOCKED"
     env = _make_env(farmer=(5, 5), day=3, tiles=tiles)
     farm = env.state.farms[0]
-    env.state.private.shed.FERTILIZER = 2
+    env.state.privates[0].shed.FERTILIZER = 2
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
     assert farm.tiles[5][5] == "LOCKED"
-    assert env.state.private.shed.FERTILIZER == 2
+    assert env.state.privates[0].shed.FERTILIZER == 2
 
 
 def test_fertilize_noop_on_weed_tile():
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
     farm.tiles[5][5] = WeedState()
-    env.state.private.shed.FERTILIZER = 2
+    env.state.privates[0].shed.FERTILIZER = 2
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
     assert isinstance(farm.tiles[5][5], WeedState)
-    assert env.state.private.shed.FERTILIZER == 2
+    assert env.state.privates[0].shed.FERTILIZER == 2
 
 
 def test_fertilize_noop_on_animal_structure():
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
     farm.tiles[5][5] = AnimalState(kind="COOP")
-    env.state.private.shed.FERTILIZER = 2
+    env.state.privates[0].shed.FERTILIZER = 2
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
     assert isinstance(farm.tiles[5][5], AnimalState)
-    assert env.state.private.shed.FERTILIZER == 2
+    assert env.state.privates[0].shed.FERTILIZER == 2
 
 
 def test_fertilize_noop_when_no_fertilizer_in_shed():
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
     farm.tiles[5][5] = _plant_on_tile(fertilized_until_day=0)
-    env.state.private.shed.FERTILIZER = 0
+    env.state.privates[0].shed.FERTILIZER = 0
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
 
     assert farm.tiles[5][5].fertilized_until_day == 0  # unchanged
-    assert env.state.private.shed.FERTILIZER == 0
+    assert env.state.privates[0].shed.FERTILIZER == 0
 
 
 # ---------------------------------------------------------------------------
@@ -166,25 +166,25 @@ def test_fertilize_noop_on_malformed_or_negative_position(bad_pos):
     env = _make_env(farmer=(5, 5), day=3)
     farm = env.state.farms[0]
     farm.tiles[5][5] = _plant_on_tile()
-    env.state.private.shed.FERTILIZER = 2
+    env.state.privates[0].shed.FERTILIZER = 2
     pos = list(bad_pos) if isinstance(bad_pos, tuple) else bad_pos
 
     fertilize(env.state, farm, pos, FertilizeActionState(type="FERTILIZE"))
 
     assert farm.tiles[5][5].fertilized_until_day == 0
-    assert env.state.private.shed.FERTILIZER == 2
+    assert env.state.privates[0].shed.FERTILIZER == 2
 
 
 def test_fertilize_noop_out_of_bounds():
     env = _make_env(rows=5, cols=5, farmer=(4, 4), day=3)
     farm = env.state.farms[0]
     farm.tiles[4][4] = _plant_on_tile()
-    env.state.private.shed.FERTILIZER = 2
+    env.state.privates[0].shed.FERTILIZER = 2
 
     fertilize(env.state, farm, [5, 0], FertilizeActionState(type="FERTILIZE"))
 
     assert farm.tiles[4][4].fertilized_until_day == 0
-    assert env.state.private.shed.FERTILIZER == 2
+    assert env.state.privates[0].shed.FERTILIZER == 2
 
 
 # ---------------------------------------------------------------------------
@@ -195,34 +195,34 @@ def test_step_dispatches_fertilize_action():
     env = _make_env(farmer=(3, 3), day=4)
     farm = env.state.farms[0]
     farm.tiles[3][3] = _plant_on_tile()
-    env.state.private.shed.FERTILIZER = 3
+    env.state.privates[0].shed.FERTILIZER = 3
 
     step = StepState(
         farmer=FertilizeActionState(type="FERTILIZE"),
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert env.state.farms[0].tiles[3][3].fertilized_until_day == 7
-    assert env.state.private.shed.FERTILIZER == 2
+    assert env.state.privates[0].shed.FERTILIZER == 2
 
 
 def test_step_fertilize_noop_without_fertilizer_does_not_set_window():
     env = _make_env(farmer=(3, 3), day=4)
     farm = env.state.farms[0]
     farm.tiles[3][3] = _plant_on_tile()
-    env.state.private.shed.FERTILIZER = 0
+    env.state.privates[0].shed.FERTILIZER = 0
 
     step = StepState(
         farmer=FertilizeActionState(type="FERTILIZE"),
         hands=[],
         market=[],
     )
-    env.step(step)
+    env.step(_turn(step))
 
     assert env.state.farms[0].tiles[3][3].fertilized_until_day == 0
-    assert env.state.private.shed.FERTILIZER == 0
+    assert env.state.privates[0].shed.FERTILIZER == 0
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ def test_fertilize_then_water_doubles_watering_bonus():
     env = _make_env(farmer=(5, 5), day=3)  # WHEAT window is [2, 4]
     farm = env.state.farms[0]
     farm.tiles[5][5] = _plant_on_tile(crop="WHEAT", planted_day=0, yield_units=0)
-    env.state.private.shed.FERTILIZER = 1
+    env.state.privates[0].shed.FERTILIZER = 1
 
     fertilize(env.state, farm, farm.farmer, FertilizeActionState(type="FERTILIZE"))
     assert farm.tiles[5][5].fertilized_until_day == 6
