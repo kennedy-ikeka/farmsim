@@ -18,8 +18,8 @@ class InformantState(BaseModel):
         search_count: Number of documents to retrieve
     """
     query: str = Field(..., description='The query of the user')
-    documents: Optional[list[Document]] = Field([], description='The retreived documents')
-    search_count: Optional[int] = Field(5, description='The number of documents to retreive')
+    documents: list[Document] = Field(default_factory=list, description='The retreived documents')
+    search_count: int = Field(5, description='The number of documents to retreive')
 
 
 class InformantWorkflow(BaseWorkflow):
@@ -84,6 +84,7 @@ class InformantWorkflow(BaseWorkflow):
         """
         super().invoke(state)
         response = self.graph.invoke(state)
+        self.logger.info('Invoked!')
         return response['documents']
 
     def as_tool(self, name: str) -> AgentToolState:
@@ -103,7 +104,7 @@ class InformantWorkflow(BaseWorkflow):
                 "behavior, building costs, and any other in-game facts that should "
                 "inform a decision."
             ),
-            func=lambda query, search_count=None: self.invoke(
+            func=lambda query, search_count=5: self.invoke(
                 InformantState(query=query, search_count=search_count)
             )
         )

@@ -124,9 +124,15 @@ class PurchaserWorkflow(BaseWorkflow):
 
         OUTPUT
 
-        Return exactly one PlanProposal.
+        Return exactly one ProposalState with these fields in json format:
+        {{
+            "objective": "string" (the objective this proposal addresses),
+            "recommendation": "string" (the recommended purchase approach for advancing the objective),
+            "priority": 1 (importance of this proposal, integer >= 1 (lower means higher priority)
+        }}
+
         Do not include explanations, Markdown, code fences, or fields outside the
-        PlanProposal schema.
+        ProposalState schema.
         """
 
         formatted_prompt = prompt.format(objective=state.objective, game_state=state.game_state)
@@ -148,6 +154,7 @@ class PurchaserWorkflow(BaseWorkflow):
         """
         super().invoke(state)
         response = self.graph.invoke(state, config=self.settings.config)
+        self.logger.info('Invoked!')
         return response['proposal']
 
     def as_tool(self, name: str) -> AgentToolState:

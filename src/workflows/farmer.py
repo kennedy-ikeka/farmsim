@@ -45,7 +45,7 @@ class FarmerWorkflow(BaseWorkflow):
         """Generate a proposal of the conversation.
 
         Args:
-            state: Current workflow state with messages
+            settings: Workflow configuration settings
 
         Returns:
             Generated proposal
@@ -108,17 +108,23 @@ class FarmerWorkflow(BaseWorkflow):
 
         OUTPUT
 
-        Return exactly one PlanProposal.
+        Return exactly one ProposalState with these fields in json format:
+        {{
+            "objective": "string" (the objective this proposal addresses),
+            "recommendation": "string" (the recommended purchase approach for advancing the objective),
+            "priority": 1 (importance of this proposal, integer >= 1 (lower means higher priority)
+        }}
+
         Do not include explanations, Markdown, code fences, or fields outside the
-        PlanProposal schema.
+        ProposalState schema.
         """
 
-        formatted_prompt = prompt.format(messages=state.messages, proposal=state.proposal, profile=state.profile)
+        formatted_prompt = prompt.format(objective=state.objective, game_state=state.game_state)
         message = [SystemMessage(content=formatted_prompt), HumanMessage(content="Generate proposal that fits the objective")]
 
         llm = get_llm().with_structured_output(ProposalState)
-        response = llm.invoke(message)
 
+        response = llm.invoke(message)
         return {"proposal": response}
 
     def invoke(self, state: FarmerState) -> ProposalState:
@@ -132,6 +138,7 @@ class FarmerWorkflow(BaseWorkflow):
         """
         super().invoke(state)
         response = self.graph.invoke(state, config=self.settings.config)
+        self.logger.info('Invoked!')
         return response['proposal']
 
     def as_tool(self, name: str) -> AgentToolState:

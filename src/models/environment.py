@@ -19,12 +19,12 @@ class StepState(BaseModel):
 
     hands: list[FarmActionState] = Field(
         default_factory=list,
-        description="The next actions assigned to hired workers."
+        description="The next actions assigned to hired workers. Empty list if no hand should act."
     )
 
     market: list[MarketActionState] = Field(
         default_factory=list,
-        description="The next market actions."
+        description="The next market actions. Empty list if no market actions is needed."
     )
 
 

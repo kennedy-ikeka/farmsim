@@ -110,39 +110,21 @@ class PlanState(BaseModel):
     status: PLAN_STATUS = Field('PENDING', description="The status of the plan")
 
 class ProposalState(BaseModel):
-    """A specialist recommendation for advancing an objective."""
-
     objective: str = Field(
-        description="The objective this proposal addresses."
+        ...,
+        description="The objective this proposal is intended to advance"
     )
-
+    
     recommendation: str = Field(
-        description="The recommended approach for advancing the objective."
+        ...,
+        description="The recommended approach for advancing the objective"
     )
-
-    reasoning: str = Field(
-        description="Why this recommendation is appropriate given the current state."
-    )
-
+    
     priority: int = Field(
+        default=1,
         ge=1,
-        description="Importance of this proposal. Lower means higher priority."
+        description="Proposal priority; lower values indicate higher priority"
     )
-
-    expected_outcome: str = Field(
-        description="The expected result if this recommendation is implemented."
-    )
-
-    constraints: list[str] = Field(
-        default_factory=list,
-        description="State-dependent limitations or requirements affecting implementation."
-    )
-
-    risks: list[str] = Field(
-        default_factory=list,
-        description="Potential losses or consequences of not addressing this proposal."
-    )
-
 class ExecutionState(BaseModel):
     """Placeholder record of a single attempt to execute a `Plan`.
 

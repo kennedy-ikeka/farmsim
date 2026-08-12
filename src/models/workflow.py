@@ -63,7 +63,7 @@ class BaseWorkflow(StateGraph):
         Args:
             state: Current workflow state
         """
-        self.logger.info('Invoked')
+        self.logger.info('Invoking...')
 
 
 class BaseAgent(BaseWorkflow):
