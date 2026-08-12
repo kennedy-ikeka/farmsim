@@ -3,9 +3,9 @@ import random
 
 from pydantic import BaseModel, Field, PrivateAttr
 
-from src.domains.environment.clock import Clock
+from src.models.clock import ClockState
 from src.models.action import FarmActionState, MarketActionState, PassActionState
-from src.models.game import GameState
+from src.models.game import GameState, PublicGameState
 from src.models.event import EventState
 
 
@@ -13,7 +13,7 @@ class StepState(BaseModel):
     """The next set of actions for the farm."""
 
     farmer: FarmActionState = Field(
-        default_factory=PassActionState,
+        default_factory=dict,
         description="The farmer's next action."
     )
 
@@ -43,8 +43,8 @@ class TurnActions(BaseModel):
 
 class EnvironmentState(BaseModel):
     seed: int = Field(description="The seed for generation")
-    state: GameState = Field(description="The analyzed state of the game")
-    clock: Clock = Field(default_factory=Clock, description="The clock of the game")
+    state: PublicGameState = Field(description="The analyzed state of the game")
+    clock: ClockState = Field(default_factory=ClockState, description="The clock of the game")
     events: list[EventState] = Field(default_factory=list, description="All events in the environment")
     done: bool = Field(default=False, description="Whether the episode has reached its final step.")
 

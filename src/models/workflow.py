@@ -1,8 +1,22 @@
+from typing import Optional
 from uuid import uuid4
 from langgraph.graph import StateGraph
 from pydantic import BaseModel, Field, computed_field
+from langchain_core.tools import StructuredTool
 
 from src.utils.logger import get_logger
+
+
+class AgentToolState(BaseModel):
+    """Represents a tool available to an AI agent.
+
+    Attributes:
+        tool: The LangChain StructuredTool instance
+        action: Optional action identifier for the tool
+    """
+
+    tool: StructuredTool
+    action: Optional[str]
 
 class WorkflowSettings(BaseModel):
     """Settings for AI workflow execution.

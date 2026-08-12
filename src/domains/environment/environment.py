@@ -13,9 +13,12 @@ end-of-day to the `Clock` controller.
 
 import random
 
+from pydantic import Field
+
 from src.models.action import PassActionState
 from src.utils.config import MAX_MARKET_ORDERS_PER_TURN
 from src.models.environment import EnvironmentState, StepResultState, TurnActions
+from src.domains.environment.clock import Clock
 
 # Re-exported for tests that import MAX_MARKET_ORDERS_PER_TURN from here.
 __all__ = ["Environment", "MAX_MARKET_ORDERS_PER_TURN"]
@@ -33,6 +36,11 @@ class Environment(EnvironmentState):
     consumption to the `Town` controller at `state.town`; time + end-of-day
     to the owned `Clock` instance.
     """
+
+    # Override the model-typed field with the controller subtype so a bare
+    # `Environment(...)` defaults to a `Clock` (with behaviour) rather than a
+    # behaviourless `ClockState`. Keeps the model layer free of domain imports.
+    clock: Clock = Field(default_factory=Clock)
 
     def step(self, payload: TurnActions):
         """Apply all players' actions for a single step to `state`, in place.

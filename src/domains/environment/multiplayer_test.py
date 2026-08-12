@@ -11,7 +11,7 @@ from src.models.action import (
 )
 from src.models.environment import StepState, TurnActions
 from src.models.farm import PlantState, WeedState
-
+from src.utils.config import TURNS_PER_DAY
 
 # ---------------------------------------------------------------------------
 # Both players' farm actions run in a single step.
@@ -124,7 +124,6 @@ def test_step_market_buy_product_stops_when_one_player_runs_out_of_money():
 
 def test_step_advances_time():
     """Each step() call advances step and hour; day rolls over at TURNS_PER_DAY."""
-    from src.utils.config import TURNS_PER_DAY
     env = _make_env(farmer=(5, 5), step=TURNS_PER_DAY - 1, day=0, players=2)
     # Plant a crop so we can see end-of-day refresh reset watered_today.
     env.state.farms[0].tiles[5][5] = PlantState(
@@ -145,7 +144,6 @@ def test_step_advances_time():
 
 def test_end_of_day_unwatered_plant_becomes_weed():
     """A plant with consecutive_unwatered=1 not watered today → weed on day rollover."""
-    from src.utils.config import TURNS_PER_DAY
     env = _make_env(farmer=(5, 5), step=TURNS_PER_DAY - 1, players=2)
     env.state.farms[0].tiles[5][5] = PlantState(
         crop="WHEAT", planted_day=0, max_lifespan_step=100,
@@ -158,7 +156,6 @@ def test_end_of_day_unwatered_plant_becomes_weed():
 
 def test_end_of_day_watered_plant_resets_counter():
     """A watered plant survives the day rollover and resets consecutive_unwatered."""
-    from src.utils.config import TURNS_PER_DAY
     env = _make_env(farmer=(5, 5), step=TURNS_PER_DAY - 1, players=2)
     env.state.farms[0].tiles[5][5] = PlantState(
         crop="WHEAT", planted_day=0, max_lifespan_step=100,
@@ -174,7 +171,6 @@ def test_end_of_day_watered_plant_resets_counter():
 
 def test_end_of_day_hires_reset_and_hands_cleared():
     """At day rollover, hires_today resets to 0 and hands are cleared."""
-    from src.utils.config import TURNS_PER_DAY
     env = _make_env(farmer=(4, 4), hands=[[5, 4]], step=TURNS_PER_DAY - 1, players=2)
     env.state.farms[0].hires_today = 3
     env.step(_turn(_step()))
@@ -184,7 +180,6 @@ def test_end_of_day_hires_reset_and_hands_cleared():
 
 def test_end_of_day_hand_inventory_dropped_to_shed():
     """A hand's inventory is dropped into the shed at day rollover; hand is gone."""
-    from src.utils.config import TURNS_PER_DAY
     env = _make_env(farmer=(4, 4), hands=[[5, 4]], step=TURNS_PER_DAY - 1, players=2)
     env.state.farms[0].hires_today = 1
     # Give the hand (index 1) some wheat.
@@ -198,7 +193,6 @@ def test_end_of_day_hand_inventory_dropped_to_shed():
 
 def test_end_of_day_farmer_keeps_inventory():
     """The main farmer's inventory persists across the day rollover."""
-    from src.utils.config import TURNS_PER_DAY
     env = _make_env(farmer=(4, 4), step=TURNS_PER_DAY - 1, players=2)
     env.state.privates[0].inventories = [{"WHEAT": 3}]
     env.step(_turn(_step()))

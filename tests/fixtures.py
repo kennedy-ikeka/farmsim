@@ -4,7 +4,7 @@ from src.domains.environment.town import Town
 from src.domains.farm import Farm
 from src.domains.market import Market
 from src.models.environment import StepState, TurnActions
-from src.models.game import GameState
+from src.models.game import PublicGameState
 from src.models.market import MarketInventory, MarketPrices
 from src.models.player import PrivateState, SeedsState, ShedState
 
@@ -58,7 +58,7 @@ def _make_env(rows=10, cols=10, farmer=(5, 5), hands=None, tiles=None,
         for crop, count in seeds.items():
             setattr(privates[0].seeds, crop, count)
 
-    state = GameState(
+    state = PublicGameState(
         remainingOverageTime=60,
         step=step,
         day=day,

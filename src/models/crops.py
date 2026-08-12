@@ -4,8 +4,6 @@ Sourced from the Object Types table in README.md. These values drive seed
 purchasing, planting, and the decay schedule.
 """
 
-TURNS_PER_DAY = 24
-
 # Per-crop growth parameters.
 #   yield_type        — "one-time" (single harvest) or "ongoing" (repeated yields)
 #   seed_cost         — fixed market price to buy one seed

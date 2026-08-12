@@ -1,4 +1,5 @@
-from src.models.crops import CROP_CONFIG, TURNS_PER_DAY
+from src.utils.config import TURNS_PER_DAY
+from src.models.crops import CROP_CONFIG
 from src.models.action import PlantActionState
 from src.models.farm import PlantState
 
