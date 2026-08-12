@@ -8,7 +8,7 @@ from src.utils.tool_set import ToolSet
 from src.workflows.farmer import FarmerWorkflow
 from src.workflows.purchaser import PurchaserWorkflow
 from src.workflows.seller import SellerWorkflow
-from src.models.game import PrivateGameState, ProposalState, StrategyState
+from src.models.game import RealityState, ProposalState, StrategyState
 from src.utils.llms import get_llm
 from src.models.workflow import WorkflowSettings
 from src.models.workflow import BaseAgent
@@ -19,7 +19,7 @@ class AnalystState(BaseModel):
     Attributes:
         game_state: The game_state we exist in
     """
-    game_state: PrivateGameState = Field(default_factory=PrivateGameState, description='The current state of the game')
+    game_state: RealityState = Field(default_factory=RealityState, description='The current state of the game')
     proposals: dict[str, ProposalState] = Field(default_factory=dict, description='The proposals by the spacialists')
     stratagy: StrategyState = Field(default_factory=StrategyState, description='The overall strategy')
 

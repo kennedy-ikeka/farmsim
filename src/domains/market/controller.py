@@ -16,7 +16,6 @@ Order" §3 and "Market Mechanics"). Per-unit processing lives in the
 `*_one.py` modules; order-event accumulation in `order_event.py`.
 """
 from src.models.action import MarketActionState
-from src.models.environment import TurnActions
 from src.models.event import EventState
 from src.models.game import GameState
 from src.models.market import MarketState
@@ -80,7 +79,7 @@ class Market(MarketState):
             occurred=occurred,
         )
 
-    def process_orders(self, state: GameState, payload: TurnActions) -> list[EventState]:
+    def process_orders(self, state: GameState, payload: list[MarketActionState]) -> list[EventState]:
         """Interleave both players' market orders one unit at a time.
 
         Returns one `EventState` per submitted order (capped at
@@ -101,11 +100,11 @@ class Market(MarketState):
         action modules).
         """
         queues: list[list[list]] = []
-        for p, step_payload in enumerate(payload.actions):
+        for p, market in enumerate(payload):
             if p >= len(state.farms):
                 break
             q = []
-            for i, action in enumerate(step_payload.market[:MAX_MARKET_ORDERS_PER_TURN]):
+            for i, action in enumerate(market[:MAX_MARKET_ORDERS_PER_TURN]):
                 remaining = 1 if action.type in _SINGLE_SHOT else getattr(action, "count", 1)
                 q.append([action, remaining, i])
             queues.append(q)

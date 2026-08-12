@@ -114,7 +114,7 @@ class PlaceActionState(BaseAction[Literal['PLACE']]):
 
 
 class PassActionState(BaseAction[Literal["PASS"]]):
-    pass
+    type: Literal["PASS"] = Field("PASS", description="The action type tag")
 
 
 FarmActionState = Annotated[

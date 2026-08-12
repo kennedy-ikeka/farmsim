@@ -31,46 +31,54 @@ class GameState(BaseModel):
     """
 
     remainingOverageTime: float = Field(
+        60,
         description=("Remaining computation/time allowance available to the player for the current game state.")
     )
 
     step: int = Field(
+        0,
         description="Current simulation step or turn number."
     )
 
     day: int = Field(
+        0,
         description="Current in-game day."
     )
 
     hour: int = Field(
+        0,
         description="Current in-game hour."
     )
 
     player: int = Field(
+        0,
         description="Identifier of the player whose turn/state is being represented."
     )
 
     farms: list[FarmState] = Field(
+        default_factory=list,
         description="All farms belonging to the players in the game."
     )
 
     market: MarketState = Field(
+        default_factory=MarketState,
         description="Public marketplace state, including inventory and prices."
     )
 
     town: TownState = Field(
+        default_factory=TownState,
         description="Current state of the town and its available shops."
     )
 
 
-class PrivateGameState(GameState):
+class RealityState(GameState):
     private: PrivateState = Field(
         default_factory=PrivateState, 
         description='Current players private state'
     )
 
 
-class PublicGameState(GameState):
+class SharedRealityState(GameState):
     privates: list[PrivateState] = Field(
             default_factory=list,
             description="Per-player private state, indexed by player id."

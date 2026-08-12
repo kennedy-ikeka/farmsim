@@ -16,7 +16,7 @@ from src.workflows.purchaser import PurchaserWorkflow
 from src.workflows.seller import SellerWorkflow
 from src.models.environment import StepState
 from src.utils.config import MAX_MARKET_ORDERS_PER_TURN
-from src.models.game import PrivateGameState, ProposalState, StrategyState
+from src.models.game import RealityState, ProposalState, StrategyState
 from src.utils.llms import get_llm
 from src.models.workflow import WorkflowSettings
 from src.models.workflow import BaseAgent
@@ -29,7 +29,7 @@ class SupervisorState(BaseModel):
         game_state: The game_state we exist in
     """
     messages: Annotated[list[AnyMessage], add_messages] = Field([], description='The conversation history')
-    game_state: PrivateGameState = Field(default_factory=PrivateGameState, description='The current state of the game')
+    game_state: RealityState = Field(default_factory=RealityState, description='The current state of the game')
     proposals: dict[str, ProposalState] = Field(default_factory=dict, description='The proposals by the spacialists')
     stratagy: StrategyState = Field(default_factory=StrategyState, description='The agents strategy')
     steps: list[StepState] = Field(default_factory=list, description='The list of steps played')

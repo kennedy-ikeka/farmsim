@@ -15,13 +15,24 @@ import random
 
 from pydantic import Field
 
+from src.domains.environment.town import Town
+from src.domains.farm.controller import Farm
+from src.domains.market.controller import Market
+from src.models.game import RealityState, SharedRealityState
+from src.models.market import MarketInventory, MarketPrices
+from src.models.player import PrivateState, SeedsState, ShedState
+from src.domains.player.player import Player
 from src.models.action import PassActionState
-from src.utils.config import MAX_MARKET_ORDERS_PER_TURN
-from src.models.environment import EnvironmentState, StepResultState, TurnActions
+from src.models.environment import EnvironmentState, StepResultState
 from src.domains.environment.clock import Clock
 
 # Re-exported for tests that import MAX_MARKET_ORDERS_PER_TURN from here.
-__all__ = ["Environment", "MAX_MARKET_ORDERS_PER_TURN"]
+# __all__ = ["Environment", "MAX_MARKET_ORDERS_PER_TURN"]
+
+
+SHED_FIELDS = ["WHEAT", "CARROT", "TOMATO", "STRAWBERRY", "MELON", "EGG", "MILK", "WOOL", "FERTILIZER", "GOOSE", "COW", "SHEEP"]
+SEED_FIELDS = ["WHEAT", "CARROT", "TOMATO", "STRAWBERRY", "MELON"]
+MARKET_FIELDS = ["WHEAT", "CARROT", "TOMATO", "STRAWBERRY", "MELON", "EGG", "MILK", "WOOL", "FERTILIZER"]
 
 
 class Environment(EnvironmentState):
@@ -42,7 +53,7 @@ class Environment(EnvironmentState):
     # behaviourless `ClockState`. Keeps the model layer free of domain imports.
     clock: Clock = Field(default_factory=Clock)
 
-    def step(self, payload: TurnActions):
+    def step(self):
         """Apply all players' actions for a single step to `state`, in place.
 
         For each player `p` (in id order), `state.player` is set to `p` and that
@@ -59,22 +70,29 @@ class Environment(EnvironmentState):
         state = self.state
 
         # 1. Farm actions — each player's farmer + hands, with state.player = p.
-        for p, step_payload in enumerate(payload.actions):
-            if p >= len(state.farms):
-                break
-            state.player = p
-            farm = state.farms[p]
-            self.events.append(farm.apply(state, farm.farmer, step_payload.farmer, 0))
+        shared = self.state.model_dump(exclude={'privates', 'player'}, mode='json')
+        players = [
+            Player(**shared, player=p, private=self.state.privates[p])
+            for p in range(len(self.state.privates))
+        ]
+
+        marketActions = []
+        for i, p in enumerate(players):
+            farm = Farm(**p.farms[i].model_dump(mode='json'))
+            action = p.play()
+            marketActions.append(action.market)
+
+            self.events.append(farm.apply(state, farm.farmer, action.farmer, 0))
             for i, hand_pos in enumerate(farm.hands):
                 hand_action = (
-                    step_payload.hands[i]
-                    if i < len(step_payload.hands)
+                    action.hands[i]
+                    if i < len(action.hands)
                     else PassActionState(type="PASS")
                 )
                 self.events.append(farm.apply(state, hand_pos, hand_action, i + 1))
 
         # 2. Market actions — interleaved one unit at a time across players.
-        self.events.extend(state.market.process_orders(state, payload))
+        self.events.extend(state.market.process_orders(state, marketActions))
 
         # 3. Town consumption — shops + town center drain market inventory.
         self.events.extend(state.town.consume(state, self._rng))
@@ -91,3 +109,46 @@ class Environment(EnvironmentState):
             reward={p: self.state.farms[p].money for p in range(len(self.state.farms))},
             done=self.done,
         )
+
+    def build(self, rows=10, cols=10, money=3000, farmer=(5, 5), hands=None, tiles=None, seeds=None, day=0, step=0, players=2, seed=42):
+        shed = ShedState(**{k: 0 for k in SHED_FIELDS})
+        seeds = SeedsState(**{k: 0 for k in SEED_FIELDS})
+
+        inv = MarketInventory(**{k: 0 for k in MARKET_FIELDS})
+        prices = MarketPrices(**{k: 1 for k in MARKET_FIELDS})
+        market = Market(inventory=inv, prices=prices)
+
+        if tiles is None:
+            tiles = [[None] * cols for _ in range(rows)]
+
+        build_farm = lambda: Farm(
+            money=money,
+            tiles=[[None if cell is None else cell for cell in row]
+                   for row in tiles],
+            farmer=list(farmer),
+            hands=hands if hands is not None else [],
+            unlocked_quadrants=["NW"],
+            hires_today=0,
+        )
+
+        farms = [build_farm() for _ in range(players)]
+        privates = [PrivateState(shed=shed, seeds=seeds, inventories=[])
+                        for _ in range(players)]
+
+        self.state = SharedRealityState(
+            remainingOverageTime=60,
+            step=step,
+            day=day,
+            hour=step % 24,
+            farms=farms,
+            privates=privates,
+            market=market,
+            town=Town(unlocked_shops=[]),
+        )
+
+    def simulate(self, steps: int):
+        """Run `steps` turns, each player playing per-turn, then step the world."""
+        for _ in range(steps):
+            if self.done:
+                break
+            self.step()

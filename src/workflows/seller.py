@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from src.models.game import PrivateGameState, ProposalState
+from src.models.game import RealityState, ProposalState
 from src.models.workflow import AgentToolState, BaseWorkflow, WorkflowSettings
 from src.utils.llms import get_llm
 from langchain_core.tools import StructuredTool
@@ -12,7 +12,7 @@ class SellerState(BaseModel):
     """State for generating a sell-related proposal."""
 
     objective: str = Field(..., description="The main objective to pursue")
-    game_state: PrivateGameState = Field(..., description="The current game state")
+    game_state: RealityState = Field(..., description="The current game state")
     proposal: Optional[ProposalState] = Field(
         default=None,
         description="The generated proposal"

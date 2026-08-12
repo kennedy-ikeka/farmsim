@@ -142,10 +142,12 @@ class FarmState(BaseModel):
     """Represents a player's individual farm."""
 
     money: float = Field(
+        3000,
         description="Amount of money currently available to the farmer."
     )
 
     tiles: list[list[TileState]] = Field(
+        default_factory=list,
         description=(
             "10x10 farm grid indexed tiles[row][col]. A tile is None when "
             "empty and unlocked, 'LOCKED' when in an unbought quadrant, a "
@@ -155,16 +157,19 @@ class FarmState(BaseModel):
     )
 
     farmer: list[int] = Field(
+        default=[5,5],
         description="Current [row, column] position of the farmer on the farm grid.",
         min_length=2,
         max_length=2,
     )
 
     hands: list = Field(
+        default=[],
         description="Items currently being carried or held by the farmer."
     )
 
     unlocked_quadrants: list[str] = Field(
+        default_factory=list,
         description=(
             "Quadrants of the farm that have been unlocked. "
             "Examples include NW, NE,, SW, and SE."
@@ -172,6 +177,7 @@ class FarmState(BaseModel):
     )
 
     hires_today: int = Field(
+        0,
         description="Number of workers hired by this farm during the current day."
     )
     
