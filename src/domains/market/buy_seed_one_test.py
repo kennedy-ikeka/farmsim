@@ -11,73 +11,72 @@ def _subjects(env):
     return env.state.farms[0], env.state.privates[0]
 
 
-def test_buy_seed_one_buys_single_seed_at_fixed_cost():
-    env = _make_env()
-    farm, priv = _subjects(env)
-    farm.money = 100.0
+class TestBuySeedOne:
+    """Tests for `buy_seed_one`."""
 
-    cost = CROP_CONFIG["WHEAT"]["seed_cost"]
-    ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=5))
+    def test_buys_single_seed_at_fixed_cost(self):
+        env = _make_env()
+        farm, priv = _subjects(env)
+        farm.money = 100.0
 
-    assert ok is True
-    assert occ == {"crop": "WHEAT", "count": 1, "unit_cost": cost, "cost": cost}
-    assert priv.seeds.WHEAT == 1
-    assert farm.money == 100.0 - cost
+        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+        ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=5))
 
+        assert ok is True
+        assert occ == {"crop": "WHEAT", "count": 1, "unit_cost": cost, "cost": cost}
+        assert priv.seeds.WHEAT == 1
+        assert farm.money == 100.0 - cost
 
-def test_buy_seed_one_accumulates_across_calls():
-    env = _make_env()
-    farm, priv = _subjects(env)
-    farm.money = 1000.0
-    action = BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=3)
-    cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+    def test_accumulates_across_calls(self):
+        env = _make_env()
+        farm, priv = _subjects(env)
+        farm.money = 1000.0
+        action = BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=3)
+        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
 
-    results = [buy_seed_one(farm, priv, action) for _ in range(3)]
+        results = [buy_seed_one(farm, priv, action) for _ in range(3)]
 
-    assert [r[0] for r in results] == [True, True, True]
-    assert priv.seeds.WHEAT == 3
-    assert farm.money == 1000.0 - 3 * cost
+        assert [r[0] for r in results] == [True, True, True]
+        assert priv.seeds.WHEAT == 3
+        assert farm.money == 1000.0 - 3 * cost
 
+    def test_noop_when_cannot_afford(self):
+        env = _make_env()
+        farm, priv = _subjects(env)
+        farm.money = 0.0
+        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
 
-def test_buy_seed_one_noop_when_cannot_afford():
-    env = _make_env()
-    farm, priv = _subjects(env)
-    farm.money = 0.0
-    cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+        ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1))
 
-    ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1))
+        assert ok is False
+        assert occ == {"crop": "WHEAT", "count": 0, "unit_cost": cost, "cost": 0}
+        assert priv.seeds.WHEAT == 0
+        assert farm.money == 0.0
 
-    assert ok is False
-    assert occ == {"crop": "WHEAT", "count": 0, "unit_cost": cost, "cost": 0}
-    assert priv.seeds.WHEAT == 0
-    assert farm.money == 0.0
+    def test_partial_then_noop_when_money_runs_out(self):
+        env = _make_env()
+        farm, priv = _subjects(env)
+        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+        farm.money = float(cost * 2 + 1)  # afford exactly 2 + a bit
+        action = BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=10)
 
+        r1 = buy_seed_one(farm, priv, action)
+        r2 = buy_seed_one(farm, priv, action)
+        r3 = buy_seed_one(farm, priv, action)
 
-def test_buy_seed_one_partial_then_noop_when_money_runs_out():
-    env = _make_env()
-    farm, priv = _subjects(env)
-    cost = CROP_CONFIG["WHEAT"]["seed_cost"]
-    farm.money = float(cost * 2 + 1)  # afford exactly 2 + a bit
-    action = BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=10)
+        assert r1[0] is True and r2[0] is True
+        assert r3[0] is False
+        assert priv.seeds.WHEAT == 2
 
-    r1 = buy_seed_one(farm, priv, action)
-    r2 = buy_seed_one(farm, priv, action)
-    r3 = buy_seed_one(farm, priv, action)
+    @pytest.mark.parametrize("crop", ["WHEAT", "CARROT", "TOMATO", "STRAWBERRY", "MELON"])
+    def test_works_for_every_crop(self, crop):
+        env = _make_env()
+        farm, priv = _subjects(env)
+        farm.money = 10_000.0
+        cost = CROP_CONFIG[crop]["seed_cost"]
 
-    assert r1[0] is True and r2[0] is True
-    assert r3[0] is False
-    assert priv.seeds.WHEAT == 2
+        ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop=crop, count=1))
 
-
-@pytest.mark.parametrize("crop", ["WHEAT", "CARROT", "TOMATO", "STRAWBERRY", "MELON"])
-def test_buy_seed_one_works_for_every_crop(crop):
-    env = _make_env()
-    farm, priv = _subjects(env)
-    farm.money = 10_000.0
-    cost = CROP_CONFIG[crop]["seed_cost"]
-
-    ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop=crop, count=1))
-
-    assert ok is True
-    assert occ["unit_cost"] == cost
-    assert getattr(priv.seeds, crop) == 1
+        assert ok is True
+        assert occ["unit_cost"] == cost
+        assert getattr(priv.seeds, crop) == 1

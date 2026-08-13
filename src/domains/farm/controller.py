@@ -52,7 +52,7 @@ class Farm(FarmState):
             case "PLANT":
                 occurred = plant(state, self, unit_pos, action)
             case "WATER":
-                occurred = water(state, self, unit_pos, action)
+                occurred = water(state, self, unit_pos)
             case "HARVEST":
                 occurred = harvest(state, self, unit_pos, action)
             case "FERTILIZE":
@@ -99,3 +99,4 @@ class Farm(FarmState):
                 elif isinstance(tile, AnimalState):
                     refresh_animal(tile)
                 # None, WeedState, and "LOCKED" tiles need no refresh.
+                

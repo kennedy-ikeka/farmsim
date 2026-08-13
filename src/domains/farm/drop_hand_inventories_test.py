@@ -32,123 +32,116 @@ def _priv_with_inventories(inventories):
                         inventories=inventories)
 
 
-# ---------------------------------------------------------------------------
-# Basic drop — hand inventory moves to shed.
-# ---------------------------------------------------------------------------
+class TestDropHandInventoriesToShed:
+    """Tests for `drop_hand_inventories_to_shed`."""
 
-def test_drop_hand_inventory_moves_all_items_to_shed():
-    farm = _farm_with_hands(1)
-    priv = _priv_with_inventories([{}, {"WHEAT": 2}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 2
-    assert priv.inventories[1] == {"WHEAT": 0}  # drained to zero (key kept)
+    # ---------------------------------------------------------------------------
+    # Basic drop — hand inventory moves to shed.
+    # ---------------------------------------------------------------------------
 
+    def test_hand_inventory_moves_all_items_to_shed(self):
+        farm = _farm_with_hands(1)
+        priv = _priv_with_inventories([{}, {"WHEAT": 2}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 2
+        assert priv.inventories[1] == {"WHEAT": 0}  # drained to zero (key kept)
 
-def test_drop_hand_inventory_multiple_items():
-    farm = _farm_with_hands(1)
-    priv = _priv_with_inventories([{}, {"WHEAT": 3, "EGG": 2, "MILK": 1}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 3
-    assert priv.shed.EGG == 2
-    assert priv.shed.MILK == 1
+    def test_hand_inventory_multiple_items(self):
+        farm = _farm_with_hands(1)
+        priv = _priv_with_inventories([{}, {"WHEAT": 3, "EGG": 2, "MILK": 1}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 3
+        assert priv.shed.EGG == 2
+        assert priv.shed.MILK == 1
 
+    def test_multiple_hands_each_drops_to_shed(self):
+        farm = _farm_with_hands(2)
+        priv = _priv_with_inventories([{}, {"WHEAT": 2}, {"CARROT": 4}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 2
+        assert priv.shed.CARROT == 4
 
-def test_drop_multiple_hands_each_drops_to_shed():
-    farm = _farm_with_hands(2)
-    priv = _priv_with_inventories([{}, {"WHEAT": 2}, {"CARROT": 4}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 2
-    assert priv.shed.CARROT == 4
+    # ---------------------------------------------------------------------------
+    # Farmer inventory (index 0) is never touched.
+    # ---------------------------------------------------------------------------
 
+    def test_does_not_touch_farmer_inventory(self):
+        farm = _farm_with_hands(1)
+        priv = _priv_with_inventories([{"WHEAT": 5}, {"WHEAT": 2}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.inventories[0] == {"WHEAT": 5}  # farmer keeps their inventory
+        assert priv.shed.WHEAT == 2  # only the hand's wheat dropped
 
-# ---------------------------------------------------------------------------
-# Farmer inventory (index 0) is never touched.
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # Shed capacity cap — overflow is discarded.
+    # ---------------------------------------------------------------------------
 
-def test_drop_does_not_touch_farmer_inventory():
-    farm = _farm_with_hands(1)
-    priv = _priv_with_inventories([{"WHEAT": 5}, {"WHEAT": 2}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.inventories[0] == {"WHEAT": 5}  # farmer keeps their inventory
-    assert priv.shed.WHEAT == 2  # only the hand's wheat dropped
+    def test_respects_shed_capacity(self):
+        farm = _farm_with_hands(1)
+        # Pre-fill shed with 98 units; hand has 5 wheat → only 2 fit.
+        priv = _priv_with_inventories([{}, {"WHEAT": 5}])
+        priv.shed.CARROT = 98  # 100 capacity - 98 = 2 space
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 2  # only 2 fit
+        assert priv.inventories[1]["WHEAT"] == 3  # 3 left over
 
+    def test_no_space_leaves_hand_inventory_untouched(self):
+        farm = _farm_with_hands(1)
+        priv = _priv_with_inventories([{}, {"WHEAT": 3}])
+        priv.shed.CARROT = 100  # at capacity
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 0
+        assert priv.inventories[1] == {"WHEAT": 3}  # nothing moved
 
-# ---------------------------------------------------------------------------
-# Shed capacity cap — overflow is discarded.
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # Empty / zero-count inventories are skipped.
+    # ---------------------------------------------------------------------------
 
-def test_drop_respects_shed_capacity():
-    farm = _farm_with_hands(1)
-    # Pre-fill shed with 98 units; hand has 5 wheat → only 2 fit.
-    priv = _priv_with_inventories([{}, {"WHEAT": 5}])
-    priv.shed.CARROT = 98  # 100 capacity - 98 = 2 space
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 2  # only 2 fit
-    assert priv.inventories[1]["WHEAT"] == 3  # 3 left over
+    def test_empty_hand_inventory_is_noop(self):
+        farm = _farm_with_hands(1)
+        priv = _priv_with_inventories([{}, {}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 0
+        assert priv.inventories[1] == {}
 
+    def test_skips_zero_count_items(self):
+        farm = _farm_with_hands(1)
+        priv = _priv_with_inventories([{}, {"WHEAT": 0, "EGG": 2}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 0
+        assert priv.shed.EGG == 2
 
-def test_drop_no_space_leaves_hand_inventory_untouched():
-    farm = _farm_with_hands(1)
-    priv = _priv_with_inventories([{}, {"WHEAT": 3}])
-    priv.shed.CARROT = 100  # at capacity
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 0
-    assert priv.inventories[1] == {"WHEAT": 3}  # nothing moved
+    # ---------------------------------------------------------------------------
+    # Invalid shed items are skipped (not crashed on).
+    # ---------------------------------------------------------------------------
 
+    def test_skips_items_not_in_shed(self):
+        farm = _farm_with_hands(1)
+        priv = _priv_with_inventories([{}, {"UNKNOWN_ITEM": 2, "WHEAT": 1}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 1  # valid item moved
+        # unknown item still in inventory (not a shed field, skipped)
+        assert priv.inventories[1].get("UNKNOWN_ITEM") == 2
 
-# ---------------------------------------------------------------------------
-# Empty / zero-count inventories are skipped.
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # Inventories list shorter than hands — loop bounds safely.
+    # ---------------------------------------------------------------------------
 
-def test_drop_empty_hand_inventory_is_noop():
-    farm = _farm_with_hands(1)
-    priv = _priv_with_inventories([{}, {}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 0
-    assert priv.inventories[1] == {}
+    def test_handles_inventories_shorter_than_hands(self):
+        """If inventories has fewer entries than hands+1, the extra hands are skipped."""
+        farm = _farm_with_hands(3)
+        # Only inventories[0] and [1] exist; hands 2 and 3 have no inventory slot.
+        priv = _priv_with_inventories([{}, {"WHEAT": 2}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 2  # hand 1 dropped; hands 2,3 had no slot
 
+    # ---------------------------------------------------------------------------
+    # No hands — nothing happens.
+    # ---------------------------------------------------------------------------
 
-def test_drop_skips_zero_count_items():
-    farm = _farm_with_hands(1)
-    priv = _priv_with_inventories([{}, {"WHEAT": 0, "EGG": 2}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 0
-    assert priv.shed.EGG == 2
-
-
-# ---------------------------------------------------------------------------
-# Invalid shed items are skipped (not crashed on).
-# ---------------------------------------------------------------------------
-
-def test_drop_skips_items_not_in_shed():
-    farm = _farm_with_hands(1)
-    priv = _priv_with_inventories([{}, {"UNKNOWN_ITEM": 2, "WHEAT": 1}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 1  # valid item moved
-    # unknown item still in inventory (not a shed field, skipped)
-    assert priv.inventories[1].get("UNKNOWN_ITEM") == 2
-
-
-# ---------------------------------------------------------------------------
-# Inventories list shorter than hands — loop bounds safely.
-# ---------------------------------------------------------------------------
-
-def test_drop_handles_inventories_shorter_than_hands():
-    """If inventories has fewer entries than hands+1, the extra hands are skipped."""
-    farm = _farm_with_hands(3)
-    # Only inventories[0] and [1] exist; hands 2 and 3 have no inventory slot.
-    priv = _priv_with_inventories([{}, {"WHEAT": 2}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 2  # hand 1 dropped; hands 2,3 had no slot
-
-
-# ---------------------------------------------------------------------------
-# No hands — nothing happens.
-# ---------------------------------------------------------------------------
-
-def test_drop_no_hands_is_noop():
-    farm = _farm_with_hands(0)
-    priv = _priv_with_inventories([{"WHEAT": 5}])
-    drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
-    assert priv.shed.WHEAT == 0
-    assert priv.inventories[0] == {"WHEAT": 5}
+    def test_no_hands_is_noop(self):
+        farm = _farm_with_hands(0)
+        priv = _priv_with_inventories([{"WHEAT": 5}])
+        drop_hand_inventories_to_shed(farm, priv, shed_capacity=100)
+        assert priv.shed.WHEAT == 0
+        assert priv.inventories[0] == {"WHEAT": 5}

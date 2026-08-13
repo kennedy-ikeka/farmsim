@@ -1,3 +1,4 @@
+from src.models.game import RealityState
 from src.utils.config import TURNS_PER_DAY
 from src.models.crops import CROP_CONFIG
 from src.models.action import PlantActionState
@@ -47,3 +48,11 @@ def plant(state, farm, unit_pos, action: PlantActionState) -> dict:
         max_lifespan_step=max_lifespan_step,
     )
     return {"crop": action.crop, "position": [row, col], "planted": True}
+
+
+def get_valid_plant_actions(state: RealityState):
+    actions: list[PlantActionState] = []
+    for seed in state.private.seeds:
+        if seed[1] > 0:
+            actions.append(PlantActionState(crop=seed[0]))
+    return actions

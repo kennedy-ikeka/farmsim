@@ -78,7 +78,8 @@ class Environment(EnvironmentState):
 
         marketActions = []
         for i, p in enumerate(players):
-            farm = Farm(**p.farms[i].model_dump(mode='json'))
+            farm = state.farms[i]
+            state.player = i
             action = p.play()
             marketActions.append(action.market)
 

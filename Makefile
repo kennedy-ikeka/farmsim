@@ -1,2 +1,5 @@
-test_watch:
-	pytest-watch -- -s
+watch:
+	watchfiles "uv run pytest -q" src tests   
+
+test:
+	pytest -s

@@ -1,11 +1,12 @@
 import math
 
+from src.models.game import RealityState
 from src.models.crops import CROP_CONFIG
 from src.models.action import WaterActionState
 from src.models.farm import PlantState
 
 
-def water(state, farm, unit_pos, action: WaterActionState) -> dict:
+def water(state, farm, unit_pos) -> dict:
     """Water the plant on the unit's current tile.
 
     No-ops (silent) when:
@@ -55,3 +56,13 @@ def water(state, farm, unit_pos, action: WaterActionState) -> dict:
     bonus = 2 if tile.fertilized_until_day >= state.day else 1
     tile.yield_units += bonus
     return {"position": [row, col], "watered": True, "bonus": bonus}
+
+
+def get_valid_water_actions(state: RealityState):
+    actions: list[WaterActionState] = []
+    farm = state.farms[state.player]
+    
+    for tile in farm.tiles:
+        if isinstance(tile, PlantState) and not tile.watered_today:
+            actions.append(WaterActionState())
+    return actions

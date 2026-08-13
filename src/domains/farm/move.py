@@ -1,4 +1,5 @@
-from src.models.action import MOVE_ACTIONS
+from src.models.action import MOVE_ACTIONS, MoveActionState
+from src.models.farm import FarmState
 
 # [row, column] deltas — farm.farmer is [row, column] per FarmState.
 _MOVE_DELTAS = {
@@ -9,7 +10,7 @@ _MOVE_DELTAS = {
 }
 
 
-def move_unit(farm, unit_pos, direction: MOVE_ACTIONS) -> dict:
+def move_unit(farm: FarmState, unit_pos, direction: MOVE_ACTIONS) -> dict:
     """Move `unit_pos` ([row, column]) one tile, clamped to the grid bounds.
 
     Locked tiles are passable — units can cross unbought quadrants but cannot
@@ -34,3 +35,23 @@ def move_unit(farm, unit_pos, direction: MOVE_ACTIONS) -> dict:
         unit_pos[1] = nc
         return {"from": from_pos, "to": [nr, nc], "moved": True}
     return {"from": from_pos, "to": from_pos, "moved": False}
+
+
+def get_valid_move_actions_for(farm: FarmState, unit_pos) -> list[MoveActionState]:
+    """Valid move directions for a unit at `unit_pos` ([row, col]).
+
+    Only directions that keep the unit in grid bounds are returned, since
+    out-of-bounds is the only case `move_unit` nullifies (locked tiles are
+    passable, so they don't filter here). Returns an empty list for a
+    malformed position.
+    """
+    if not (isinstance(unit_pos, list) and len(unit_pos) == 2):
+        return []
+    row, col = unit_pos
+    rows = len(farm.tiles)
+    cols = len(farm.tiles[0]) if rows else 0
+    return [
+        MoveActionState(type=act)
+        for act, (dr, dc) in _MOVE_DELTAS.items()
+        if 0 <= row + dr < rows and 0 <= col + dc < cols
+    ]

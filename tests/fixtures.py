@@ -1,9 +1,12 @@
 """Shared test fixture for building a minimal `Environment` instance."""
+from unittest.mock import patch
+
 from src.domains.environment import Environment
 from src.domains.environment.town import Town
 from src.domains.farm import Farm
 from src.domains.market import Market
-from src.models.environment import StepState, TurnActions
+from src.domains.player.player import Player
+from src.models.environment import StepState
 from src.models.game import SharedRealityState
 from src.models.market import MarketInventory, MarketPrices
 from src.models.player import PrivateState, SeedsState, ShedState
@@ -30,7 +33,7 @@ def _zero_market():
 
 
 def _make_env(rows=10, cols=10, farmer=(5, 5), hands=None, tiles=None,
-             seeds=None, day=0, step=0, players=2):
+             seeds=None, day=0, step=0, players=1):
     """Build a minimal Environment whose `state` is a valid two-player GameState.
 
     `seeds` may be a {crop: count} dict to pre-populate player 0's seed slot.
@@ -72,14 +75,27 @@ def _make_env(rows=10, cols=10, farmer=(5, 5), hands=None, tiles=None,
     return Environment(state=state, seed=42)
 
 
-def _turn(*step_states):
-    """Build a `TurnActions` payload from per-player `StepState`s.
+def _play(env, *per_player_steps, default=None):
+    """Run one `env.step()` with scripted per-player actions.
 
-    Missing players (fewer StepStates than farms) default to an all-PASS
-    `StepState` so single-player tests wrap minimally: `_turn(my_step)`.
+    Patches `Player.play` so player `p` returns `per_player_steps[p]`. Players
+    beyond the supplied steps play `default` (an all-PASS `StepState` from
+    `_step()` if not given). Replaces the old `_turn(payload)` + payload-driven
+    `env.step(payload)` flow now that `Environment.step` is player-driven.
+
+    Examples:
+        _play(env, step)              # player 0 plays `step`, others pass
+        _play(env, step0, step1)      # both players scripted (2-player env)
+        _play(env, _step())           # equivalent to a pure pass turn
     """
-    actions = list(step_states)
-    return TurnActions(actions=actions)
+    default_step = default if default is not None else _step()
+    steps = list(per_player_steps)
+
+    def _scripted_play(self):
+        return steps[self.player] if self.player < len(steps) else default_step
+
+    with patch.object(Player, "play", _scripted_play):
+        env.step()
 
 
 def _step(farmer=None, hands=None, market=None):
