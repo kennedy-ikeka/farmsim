@@ -124,7 +124,6 @@ class Player(RealityState):
         """
         actions: list = []
         farm = self.farms[self.player]
-        actions.extend(self.get_valid_pass_actions())
         actions.extend(get_valid_move_actions_for(farm, unit_pos))
         actions.extend(get_valid_plant_actions_for(self, unit_pos))
         actions.extend(get_valid_water_actions_for(farm, unit_pos))
@@ -141,7 +140,8 @@ class Player(RealityState):
 
     def get_valid_actions(self) -> ValidStepsState:
         farm = self.farms[self.player]
-        farmer = self.get_valid_farm_actions_for(farm.farmer, 0)
+        farmer = list(self.get_valid_pass_actions())
+        farmer.extend(self.get_valid_farm_actions_for(farm.farmer, 0))
 
         hands: list[list[ActionState]] = []
         for h, hand_pos in enumerate(farm.hands):

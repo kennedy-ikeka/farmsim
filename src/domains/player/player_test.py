@@ -27,6 +27,16 @@ from src.models.action import (
 )
 from src.models.farm import AnimalState, PlantState, WeedState
 from src.models.player import InventoryState
+from src.models.environment import ValidStepsState
+
+
+def _all_actions(vsa: ValidStepsState) -> list:
+    """Flatten a ValidStepsState into a flat list of all actions."""
+    actions = list(vsa.farmer)
+    for hand in vsa.hands:
+        actions.extend(hand)
+    actions.extend(vsa.market)
+    return actions
 
 
 def _move_types(actions):
@@ -42,53 +52,53 @@ class TestGetValidActions:
 
     def test_includes_pass(self):
         player = Player().build(farmer=(5, 5))
-        assert "PASS" in _types(player.get_valid_actions())
+        assert "PASS" in _types(_all_actions(player.get_valid_actions()))
 
     def test_move_set_center_farmer_no_hands(self):
         """The four in-bounds farmer moves are present (other action types may
         also appear when the tile is empty, so filter to moves here)."""
         player = Player().build(farmer=(5, 5), hands=[])
-        assert _move_types(player.get_valid_actions()) == ["EAST", "NORTH", "SOUTH", "WEST"]
+        assert _move_types(_all_actions(player.get_valid_actions())) == ["EAST", "NORTH", "SOUTH", "WEST"]
 
     def test_move_set_corner_farmer(self):
         player = Player().build(farmer=(0, 0), hands=[])
-        assert _move_types(player.get_valid_actions()) == ["EAST", "SOUTH"]
+        assert _move_types(_all_actions(player.get_valid_actions())) == ["EAST", "SOUTH"]
 
     def test_move_union_across_hands(self):
         """One hand at NW corner, one at SE — the move union is still all four."""
         player = Player().build(farmer=(5, 5), hands=[[0, 0], [9, 9]])
-        assert set(_move_types(player.get_valid_actions())) == {"EAST", "NORTH", "SOUTH", "WEST"}
+        assert set(_move_types(_all_actions(player.get_valid_actions()))) == {"EAST", "NORTH", "SOUTH", "WEST"}
 
     def test_move_count_reflects_every_unit(self):
         """4 (farmer) + 2 (hand 0) + 2 (hand 1) = 8 move actions, plus 1 pass."""
         player = Player().build(farmer=(5, 5), hands=[[0, 0], [9, 9]])
-        actions = player.get_valid_actions()
+        actions = _all_actions(player.get_valid_actions())
         assert sum(1 for a in actions if isinstance(a, MoveActionState)) == 8
         assert sum(1 for a in actions if isinstance(a, PassActionState)) == 1
 
     def test_move_union_edge_farmer_with_edge_hand(self):
         player = Player().build(farmer=(0, 5), hands=[[9, 0]])
-        types = _move_types(player.get_valid_actions())
+        types = _move_types(_all_actions(player.get_valid_actions()))
         assert set(types) == {"EAST", "NORTH", "SOUTH", "WEST"}
 
     def test_includes_build_on_empty_tile(self):
         """A farmer on an empty tile gets BUILD_COOP and BUILD_PASTURE."""
         player = Player().build(farmer=(5, 5), hands=[])
-        types = _types(player.get_valid_actions())
+        types = _types(_all_actions(player.get_valid_actions()))
         assert "BUILD_COOP" in types
         assert "BUILD_PASTURE" in types
 
     def test_includes_plant_with_seeds_on_empty_tile(self):
         """A farmer on an empty tile with WHEAT seeds gets a PLANT action."""
         player = Player().build(farmer=(5, 5), seeds={"WHEAT": 2})
-        plants = [a for a in player.get_valid_actions() if isinstance(a, PlantActionState)]
+        plants = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, PlantActionState)]
         assert len(plants) == 1
         assert plants[0].crop == "WHEAT"
 
     def test_includes_water_on_unwatered_plant(self):
         plant = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=100)
         player = Player().build(farmer=(0, 0), tiles=[[plant]])
-        waters = [a for a in player.get_valid_actions() if isinstance(a, WaterActionState)]
+        waters = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, WaterActionState)]
         assert len(waters) == 1
 
     def test_includes_harvest_on_mature_plant(self):
@@ -96,57 +106,57 @@ class TestGetValidActions:
         plant = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=100,
                            yield_units=3)
         player = Player().build(farmer=(0, 0), tiles=[[plant]], day=2)
-        harvests = [a for a in player.get_valid_actions() if isinstance(a, HarvestActionState)]
+        harvests = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, HarvestActionState)]
         assert len(harvests) == 1
 
     def test_includes_dig_on_weed(self):
         player = Player().build(farmer=(0, 0), tiles=[[WeedState()]])
-        assert any(isinstance(a, DigActionState) for a in player.get_valid_actions())
+        assert any(isinstance(a, DigActionState) for a in _all_actions(player.get_valid_actions()))
 
     def test_includes_fertilize_on_plant_with_fertilizer(self):
         plant = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=100)
         player = Player().build(farmer=(0, 0), tiles=[[plant]], shed={"FERTILIZER": 1})
-        assert any(isinstance(a, FertilizeActionState) for a in player.get_valid_actions())
+        assert any(isinstance(a, FertilizeActionState) for a in _all_actions(player.get_valid_actions()))
 
     def test_includes_pickup_when_shed_adjacent_with_stock(self):
         # (4,4) is one of the four shed-adjacent tiles on a 10x10 grid.
         player = Player().build(farmer=(4, 4), shed={"WHEAT": 1})
-        pickups = [a for a in player.get_valid_actions() if isinstance(a, PickupActionState)]
+        pickups = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, PickupActionState)]
         assert len(pickups) == 1
         assert pickups[0].item == "WHEAT"
 
     def test_no_pickup_when_not_shed_adjacent(self):
         player = Player().build(farmer=(0, 0), shed={"WHEAT": 1})
-        assert not any(isinstance(a, PickupActionState) for a in player.get_valid_actions())
+        assert not any(isinstance(a, PickupActionState) for a in _all_actions(player.get_valid_actions()))
 
     def test_includes_feed_on_hungry_animal_with_wheat(self):
         coop = AnimalState(kind="COOP", animal="GOOSE")
         player = Player().build(farmer=(0, 0), tiles=[[coop]], shed={"WHEAT": 1})
-        assert any(isinstance(a, FeedActionState) for a in player.get_valid_actions())
+        assert any(isinstance(a, FeedActionState) for a in _all_actions(player.get_valid_actions()))
 
     def test_includes_collect_fertilizer_when_available(self):
         coop = AnimalState(kind="COOP", animal="GOOSE", fertilizer_available=1)
         player = Player().build(farmer=(0, 0), tiles=[[coop]])
         assert any(isinstance(a, CollectFertilizerActionState)
-                   for a in player.get_valid_actions())
+                   for a in _all_actions(player.get_valid_actions()))
 
     def test_includes_care_on_uncared_animal(self):
         coop = AnimalState(kind="COOP", animal="GOOSE")
         player = Player().build(farmer=(0, 0), tiles=[[coop]])
-        assert any(isinstance(a, CareActionState) for a in player.get_valid_actions())
+        assert any(isinstance(a, CareActionState) for a in _all_actions(player.get_valid_actions()))
 
     def test_includes_place_animal_on_matching_empty_structure(self):
         coop = AnimalState(kind="COOP", animal=None)
         player = Player().build(farmer=(0, 0), tiles=[[coop]],
                               inventories=[InventoryState(GOOSE=1)])
-        places = [a for a in player.get_valid_actions() if isinstance(a, PlaceActionState)]
+        places = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, PlaceActionState)]
         assert any(p.item == "GOOSE" for p in places)
 
     def test_hand_actions_aggregated(self):
         """A hand on an empty tile also gets BUILD actions (inv_index 1)."""
         player = Player().build(farmer=(5, 5), hands=[[4, 4]])
         # Farmer + hand each on empty tiles -> 2 BUILD_COOP + 2 BUILD_PASTURE.
-        builds = [a for a in player.get_valid_actions()
+        builds = [a for a in _all_actions(player.get_valid_actions())
                   if isinstance(a, (BuildCoopActionState, BuildPastureActionState))]
         assert len(builds) == 4
 

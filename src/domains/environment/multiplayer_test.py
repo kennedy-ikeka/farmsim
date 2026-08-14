@@ -61,7 +61,7 @@ class TestStepMultiplayer:
             crop="WHEAT", planted_day=0, max_lifespan_step=100,
         )
         env.state.farms[0].tiles[5][5].watered_today = True
-        env.step()
+        _play(env, _step())
         assert env.state.step == TURNS_PER_DAY
         assert env.state.day == 1
         assert env.state.hour == 0
@@ -134,7 +134,7 @@ class TestEndOfDay:
         )
         env.state.farms[0].tiles[5][5].consecutive_unwatered = 1
         env.state.farms[0].tiles[5][5].watered_today = False
-        env.step()
+        _play(env, _step())
         assert isinstance(env.state.farms[0].tiles[5][5], WeedState)
 
     def test_watered_plant_resets_counter(self):
@@ -145,7 +145,7 @@ class TestEndOfDay:
         )
         env.state.farms[0].tiles[5][5].consecutive_unwatered = 1
         env.state.farms[0].tiles[5][5].watered_today = True
-        env.step()
+        _play(env, _step())
         tile = env.state.farms[0].tiles[5][5]
         assert isinstance(tile, PlantState)
         assert tile.consecutive_unwatered == 0
@@ -155,7 +155,7 @@ class TestEndOfDay:
         """At day rollover, hires_today resets to 0 and hands are cleared."""
         env = _make_env(farmer=(4, 4), hands=[[5, 4]], step=TURNS_PER_DAY - 1, players=2)
         env.state.farms[0].hires_today = 3
-        env.step()
+        _play(env, _step())
         assert env.state.farms[0].hires_today == 0
         assert env.state.farms[0].hands == []
 
@@ -165,7 +165,7 @@ class TestEndOfDay:
         env.state.farms[0].hires_today = 1
         # Give the hand (index 1) some wheat.
         env.state.privates[0].inventories = [InventoryState(), InventoryState(WHEAT=2)]
-        env.step()
+        _play(env, _step())
         assert env.state.privates[0].shed.WHEAT == 2
         # Inventories truncated to just the farmer's (length 1).
         assert len(env.state.privates[0].inventories) == 1
@@ -175,7 +175,7 @@ class TestEndOfDay:
         """The main farmer's inventory persists across the day rollover."""
         env = _make_env(farmer=(4, 4), step=TURNS_PER_DAY - 1, players=2)
         env.state.privates[0].inventories = [InventoryState(WHEAT=3)]
-        env.step()
+        _play(env, _step())
         assert env.state.privates[0].inventories[0].WHEAT == 3
 
 
@@ -195,6 +195,6 @@ class TestStepResult:
         """The done flag is set when step reaches EPISODE_STEPS."""
         from src.utils.config import EPISODE_STEPS
         env = _make_env(farmer=(5, 5), step=EPISODE_STEPS - 1, players=2)
-        env.step()
+        _play(env, _step())
         assert env.done is True
         assert env.state.step == EPISODE_STEPS
