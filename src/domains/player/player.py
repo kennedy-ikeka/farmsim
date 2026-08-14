@@ -8,8 +8,7 @@ from src.domains.market import Market
 from src.models.action import PassActionState
 from src.models.game import RealityState
 from src.models.environment import StepState
-from src.models.player import PlayerConfig, ShedState, SeedsState, PrivateState
-from src.models.resource_weights import ResourceWeights
+from src.models.player import PlayerConfig, ShedState, SeedsState, PrivateState, ResourceWeights
 from src.models.market import MarketInventory, MarketPrices
 from src.domains.player.valid_actions import get_valid_actions
 from src.domains.player.scoring import score_valid_actions

@@ -1,7 +1,6 @@
 """Tests for `Environment.simulate`."""
 from src.domains.environment.environment import Environment
-from src.models.player import PlayerConfig
-from src.models.resource_weights import ResourceWeights
+from src.models.player import PlayerConfig, ResourceWeights
 from src.domains.player.player import Player
 from tests.fixtures import _make_env
 

@@ -1,15 +1,26 @@
 """Action scoring — cost / reward / risk scores for valid actions.
 
 Cost score = sum((usage / available) * weight) for each consumed resource.
-Reward and risk scores are stubbed to 0 (TODO).
-Final score = reward - (cost + risk) / 2  →  -cost / 2 for now.
+Reward score = sum((gain / available) * weight) for each gained resource.
+Risk score is stubbed to 0 (TODO).
+Final score = reward - (cost + risk) / 2.
+
+`action_resource_usage` and `action_resource_gain` are symmetric: the former
+lists what an action consumes, the latter what it gains. SELL gains MONEY,
+BUY_SEED gains SEED (economic value), BUY_ANIMAL gains ANIMAL (economic
+value), BUY_LAND gains LAND (new empty tiles), HIRE gains HAND, HARVEST gains
+MONEY (crop sale value from the unit's tile), COLLECT_FERTILIZER gains MONEY
+(fertilizer sale value). Enabler actions whose value is deferred — PLANT,
+BUILD_*, WATER, FERTILIZE, CARE, FEED, PICKUP, PLACE, MOVE, PASS, DIG,
+BUY_PRODUCT — gain nothing here; their payoff is realized by the harvest /
+collect / sell they make possible, which is captured on those actions.
 """
 from src.utils.config import EPISODE_STEPS
 from src.models.crops import CROP_CONFIG
 from src.models.animals import ANIMAL_CONFIG
 from src.domains.market.buy_land import QUADRANT_COST, QUADRANT_ORDER
 from src.domains.market.hire import FARM_HAND_COST_MULT, _fib
-from src.models.farm import AnimalState
+from src.models.farm import AnimalState, PlantState
 from src.models.action import ActionState
 from src.models.game import RealityState
 from src.models.scoring import ScoredActionState, ScoredValidStepsState
@@ -99,8 +110,72 @@ def cost_score(action: ActionState, player: RealityState) -> float:
     )
 
 
+def action_resource_gain(action: ActionState, player: RealityState) -> dict[str, float]:
+    """How much of each resource this action gains.
+
+    Mirrors `action_resource_usage` for the gain side. Each gain is valued the
+    same way the matching availability is valued (raw count for MONEY/LAND/HAND,
+    economic value for SEED/ANIMAL), so `(gain / available)` is dimensionless.
+
+    HARVEST and COLLECT_FERTILIZER look up the unit's current tile for the crop
+    / animal. `score_action` only receives `(action, player)` — no per-unit
+    position — so the farmer's tile (`farm.farmer`) is used. This is exact for
+    farmer actions and approximate for hand actions (a hand's HARVEST is scored
+    against the farmer's tile, not the hand's); execution is unaffected since
+    the action module re-checks the hand's own tile.
+    """
+    gain: dict[str, float] = {}
+    farm = player.farms[player.player]
+    prices = player.market.prices
+    t = action.type
+
+    if t == "SELL":
+        gain["MONEY"] = float(action.count * getattr(prices, action.item, 0))
+    elif t == "BUY_SEED":
+        gain["SEED"] = float(action.count * CROP_CONFIG[action.crop].seed_cost)
+    elif t == "BUY_ANIMAL":
+        gain["ANIMAL"] = float(action.count * ANIMAL_CONFIG[action.animal].cost)
+    elif t == "HIRE":
+        gain["HAND"] = 1.0
+    elif t == "BUY_LAND":
+        next_quad = None
+        for q in QUADRANT_ORDER:
+            if q not in farm.unlocked_quadrants:
+                next_quad = q
+                break
+        if next_quad is not None:
+            rows = len(farm.tiles)
+            cols = len(farm.tiles[0]) if rows else 0
+            half_r, half_c = rows // 2, cols // 2
+            ranges = {
+                "NW": (0, half_r, 0, half_c),
+                "NE": (0, half_r, half_c, cols),
+                "SW": (half_r, rows, 0, half_c),
+                "SE": (half_r, rows, half_c, cols),
+            }
+            r0, r1, c0, c1 = ranges[next_quad]
+            gain["LAND"] = float((r1 - r0) * (c1 - c0))
+    elif t == "HARVEST":
+        tile = _tile_at(farm, farm.farmer)
+        if isinstance(tile, PlantState) and tile.yield_units > 0:
+            gain["MONEY"] = float(tile.yield_units * getattr(prices, tile.crop, 0))
+    elif t == "COLLECT_FERTILIZER":
+        tile = _tile_at(farm, farm.farmer)
+        if (isinstance(tile, AnimalState) and tile.animal is not None
+                and tile.fertilizer_available > 0):
+            gain["MONEY"] = float(getattr(prices, "FERTILIZER", 0))
+
+    return gain
+
+
 def reward_score(action: ActionState, player: RealityState) -> float:
-    return 0.0  # TODO
+    gain = action_resource_gain(action, player)
+    avail = available_resources(player)
+    weights = player.private.config.resource_weights
+    return sum(
+        (gain[r] / max(avail[r], 1.0)) * getattr(weights, r)
+        for r in gain if gain[r] > 0
+    )
 
 
 def risk_score(action: ActionState, player: RealityState) -> float:
@@ -108,9 +183,9 @@ def risk_score(action: ActionState, player: RealityState) -> float:
 
 
 def score_action(action: ActionState, player: RealityState) -> ScoredActionState:
-    cost = cost_score(action, player)
-    reward = reward_score(action, player)
-    risk = risk_score(action, player)
+    cost = cost_score(action, player) * player.private.config.score_weights.COST
+    reward = reward_score(action, player) * player.private.config.score_weights.REWARD
+    risk = risk_score(action, player) * player.private.config.score_weights.RISK
     score = reward - (cost + risk) / 2
     return ScoredActionState(
         action=action, score=score,
@@ -127,3 +202,15 @@ def score_valid_actions(valid_steps: ValidStepsState, player: RealityState) -> S
     ]
     market = [score_action(a, player) for a in valid_steps.market]
     return ScoredValidStepsState(farmer=farmer, hands=hands, market=market)
+
+
+def _tile_at(farm, pos):
+    """Return the tile at `pos` ([row, col]) or `None` if out of bounds."""
+    if not (isinstance(pos, list) and len(pos) == 2):
+        return None
+    r, c = pos[0], pos[1]
+    rows = len(farm.tiles)
+    cols = len(farm.tiles[0]) if rows else 0
+    if 0 <= r < rows and 0 <= c < cols:
+        return farm.tiles[r][c]
+    return None

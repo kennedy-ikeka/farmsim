@@ -173,9 +173,11 @@ class Environment(EnvironmentState):
         Returns a `SimulationResultState` with each player's final bank balance
         and the winning player id (highest balance, `None` on a tie).
         """
-        if player_configs:
-            for p, cfg in enumerate(player_configs):
-                self.state.privates[p].config = cfg
+        players = len(player_configs)
+        self.build(
+            player_configs=player_configs, 
+            players=players if players else 2
+        )
 
         self.logger.info("simulate start: steps=%s players=%s", steps, len(self.state.privates))
         for _ in range(steps):

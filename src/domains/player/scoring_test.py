@@ -4,6 +4,7 @@ from src.domains.player.valid_actions import get_valid_actions
 from src.domains.player.scoring import (
     available_resources,
     action_resource_usage,
+    action_resource_gain,
     cost_score,
     reward_score,
     risk_score,
@@ -14,14 +15,17 @@ from src.models.action import (
     BuyAnimalActionState,
     BuyLandActionState,
     BuySeedActionState,
+    CollectFertilizerActionState,
+    HarvestActionState,
+    HireActionState,
     MoveActionState,
     PassActionState,
     PlantActionState,
+    SellActionState,
     BuildCoopActionState,
-    HireActionState,
 )
 from src.models.farm import AnimalState, PlantState
-from src.models.resource_weights import ResourceWeights
+from src.models.player import ResourceWeights
 from src.utils.config import EPISODE_STEPS
 
 
@@ -210,12 +214,23 @@ class TestScoreValidActions:
         assert len(scored.hands) == len(valid.hands)
         assert len(scored.market) == len(valid.market)
 
-    def test_all_scored_actions_have_negative_scores(self):
-        """With only cost (reward=0), all final scores should be negative."""
+    def test_all_scored_actions_have_nonnegative_reward(self):
+        """Reward scores are non-negative (gains are never negative)."""
         player = Player().build(money=3000, seeds={"WHEAT": 5})
         scored = score_valid_actions(get_valid_actions(player), player)
         for s in scored.farmer + scored.market:
-            assert s.score <= 0.0
+            assert s.reward_score >= 0.0
+
+    def test_sell_action_has_positive_final_score_when_broke(self):
+        """SELL generates MONEY reward; when broke the reward dominates cost."""
+        # Broke (money=0) but holding 1 WHEAT → SELL is valid and scores positive.
+        player = Player().build(money=0, shed={"WHEAT": 1})
+        scored = score_valid_actions(get_valid_actions(player), player)
+        sells = [s for s in scored.market if s.action.type == "SELL"]
+        assert sells, "expected at least one SELL action"
+        for s in sells:
+            assert s.reward_score > 0.0
+            assert s.score > 0.0
 
     def test_smoke_test_with_rich_player(self):
         """A rich player with seeds gets scored actions including BUY_SEED and PLANT."""
@@ -226,3 +241,117 @@ class TestScoreValidActions:
         assert "PASS" in farmer_types
         assert "PLANT" in farmer_types
         assert "BUY_SEED" in market_types
+
+
+class TestActionResourceGain:
+    def test_sell_gains_money(self):
+        """SELL gains MONEY = count * price. Player().build sets all prices to 1."""
+        player = Player().build(money=3000, shed={"WHEAT": 1})
+        gain = action_resource_gain(SellActionState(type="SELL", item="WHEAT", count=1), player)
+        assert gain == {"MONEY": 1.0}
+
+    def test_buy_seed_gains_seed_value(self):
+        """BUY_SEED gains SEED = count * seed_cost (economic value). WHEAT seed_cost=10."""
+        player = Player().build(money=3000)
+        gain = action_resource_gain(BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1), player)
+        assert gain == {"SEED": 10.0}
+
+    def test_buy_animal_gains_animal_value(self):
+        """BUY_ANIMAL gains ANIMAL = count * cost. GOOSE cost=300."""
+        player = Player().build(money=3000)
+        gain = action_resource_gain(BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=1), player)
+        assert gain == {"ANIMAL": 300.0}
+
+    def test_hire_gains_hand(self):
+        player = Player().build(money=3000, hires_today=0)
+        gain = action_resource_gain(HireActionState(type="HIRE"), player)
+        assert gain == {"HAND": 1.0}
+
+    def test_buy_land_gains_locked_tiles(self):
+        """BUY_LAND gains LAND = LOCKED tiles in the next quadrant (NE = 25 on 10x10)."""
+        player = Player().build(money=3000, unlocked_quadrants=["NW"])
+        gain = action_resource_gain(BuyLandActionState(type="BUY_LAND"), player)
+        assert gain == {"LAND": 25.0}
+
+    def test_harvest_gains_crop_value(self):
+        """HARVEST gains MONEY = yield_units * price (WHEAT price=1 in build)."""
+        plant = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=100, yield_units=3)
+        player = Player().build(farmer=(0, 0), tiles=[[plant]])
+        gain = action_resource_gain(HarvestActionState(type="HARVEST"), player)
+        assert gain == {"MONEY": 3.0}
+
+    def test_collect_fertilizer_gains_fertilizer_value(self):
+        """COLLECT_FERTILIZER gains MONEY = FERTILIZER price (=1 in build)."""
+        coop = AnimalState(kind="COOP", animal="GOOSE", fertilizer_available=1)
+        player = Player().build(farmer=(0, 0), tiles=[[coop]])
+        gain = action_resource_gain(CollectFertilizerActionState(type="COLLECT_FERTILIZER"), player)
+        assert gain == {"MONEY": 1.0}
+
+    def test_enabler_actions_gain_nothing(self):
+        """PLANT, MOVE, PASS, BUILD_COOP have only deferred value → no gain."""
+        player = Player().build(money=3000, seeds={"WHEAT": 5})
+        for action in [PlantActionState(type="PLANT", crop="WHEAT"),
+                       MoveActionState(type="NORTH"),
+                       PassActionState(),
+                       BuildCoopActionState(type="BUILD_COOP")]:
+            assert action_resource_gain(action, player) == {}
+
+    def test_harvest_no_gain_when_no_yield(self):
+        """A plant with yield_units=0 gives no HARVEST gain."""
+        plant = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=100, yield_units=0)
+        player = Player().build(farmer=(0, 0), tiles=[[plant]])
+        assert action_resource_gain(HarvestActionState(type="HARVEST"), player) == {}
+
+    def test_collect_fertilizer_no_gain_when_unavailable(self):
+        """An animal tile with no fertilizer_available gives no gain."""
+        coop = AnimalState(kind="COOP", animal="GOOSE", fertilizer_available=0)
+        player = Player().build(farmer=(0, 0), tiles=[[coop]])
+        assert action_resource_gain(CollectFertilizerActionState(type="COLLECT_FERTILIZER"), player) == {}
+
+
+class TestRewardScore:
+    def test_sell_reward_proportional_to_price(self):
+        """SELL WHEAT (price=1) when broke: reward = (1 / max(0,1)) * MONEY weight = 1."""
+        player = Player().build(money=0, shed={"WHEAT": 1})
+        reward = reward_score(SellActionState(type="SELL", item="WHEAT", count=1), player)
+        assert abs(reward - 1.0) < 1e-9
+
+    def test_buy_seed_reward_scales_with_value(self):
+        """BUY_SEED WHEAT gains 10 seed-value; with 0 seeds → reward = 10 * SEED weight."""
+        player = Player().build(money=3000, seeds={"WHEAT": 0})
+        reward = reward_score(BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1), player)
+        assert abs(reward - 10.0) < 1e-9
+
+    def test_sell_reward_diminishes_when_rich(self):
+        """SELL WHEAT (gain=1) with money=3000 → reward = (1/3000) * weight (small)."""
+        player = Player().build(money=3000, shed={"WHEAT": 1})
+        reward = reward_score(SellActionState(type="SELL", item="WHEAT", count=1), player)
+        assert abs(reward - (1.0 / 3000.0)) < 1e-9
+
+    def test_custom_weights_change_reward(self):
+        """Bumping MONEY weight from 1.0 to 5.0 scales the SELL reward 5x."""
+        base = Player().build(money=0, shed={"WHEAT": 1})
+        heavy = Player().build(
+            money=0, shed={"WHEAT": 1},
+            resource_weights=ResourceWeights(MONEY=5.0),
+        )
+        r_base = reward_score(SellActionState(type="SELL", item="WHEAT", count=1), base)
+        r_heavy = reward_score(SellActionState(type="SELL", item="WHEAT", count=1), heavy)
+        assert abs(r_heavy - r_base * 5.0) < 1e-9
+
+    def test_enabler_reward_is_zero(self):
+        """PLANT has no gain → reward = 0."""
+        player = Player().build(money=3000, seeds={"WHEAT": 5})
+        assert reward_score(PlantActionState(type="PLANT", crop="WHEAT"), player) == 0.0
+
+
+class TestFinalScoreWithReward:
+    def test_final_score_is_reward_minus_half_cost(self):
+        """With risk=0: score = reward - cost/2. Uses SELL when broke (reward=1, cost=step)."""
+        player = Player().build(money=0, shed={"WHEAT": 1})
+        scored = score_action(SellActionState(type="SELL", item="WHEAT", count=1), player)
+        step_cost = (1.0 / EPISODE_STEPS) * player.private.config.resource_weights.STEP
+        expected = scored.reward_score - (scored.cost_score + 0.0) / 2
+        assert abs(scored.score - expected) < 1e-9
+        assert abs(scored.cost_score - step_cost) < 1e-9
+        assert scored.reward_score == 1.0
