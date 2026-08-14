@@ -1,5 +1,6 @@
-from typing import get_args
+import random
 
+from src.utils.config import MAX_MARKET_ORDERS_PER_TURN
 from src.domains.farm.move import get_valid_move_actions_for
 from src.domains.farm.plant import get_valid_plant_actions_for
 from src.domains.farm.water import get_valid_water_actions_for
@@ -22,7 +23,7 @@ from src.domains.farm import Farm
 from src.domains.market import Market
 from src.models.action import ActionState, PassActionState
 from src.models.game import RealityState
-from src.models.environment import StepState
+from src.models.environment import StepState, ValidStepsState
 from src.models.player import ShedState, SeedsState, PrivateState
 from src.models.market import MarketInventory, MarketPrices
 
@@ -113,7 +114,7 @@ class Player(RealityState):
         actions.extend(get_valid_buy_land_actions(self))
         return actions
 
-    def get_valid_farm_actions_for(player: RealityState, unit_pos, inv_index: int) -> list:
+    def get_valid_farm_actions_for(self, unit_pos, inv_index: int) -> list:
         """All valid farm actions for a single unit (farmer or hired hand) at `unit_pos`.
 
         `inv_index` is the unit's slot in `player.private.inventories` (farmer = 0,
@@ -122,34 +123,48 @@ class Player(RealityState):
         mutate state when played.
         """
         actions: list = []
-        farm = player.farms[player.player]
+        farm = self.farms[self.player]
+        actions.extend(self.get_valid_pass_actions())
         actions.extend(get_valid_move_actions_for(farm, unit_pos))
-        actions.extend(get_valid_plant_actions_for(player, unit_pos))
+        actions.extend(get_valid_plant_actions_for(self, unit_pos))
         actions.extend(get_valid_water_actions_for(farm, unit_pos))
-        actions.extend(get_valid_harvest_actions_for(player, unit_pos))
-        actions.extend(get_valid_fertilize_actions_for(player, unit_pos))
+        actions.extend(get_valid_harvest_actions_for(self, unit_pos))
+        actions.extend(get_valid_fertilize_actions_for(self, unit_pos))
         actions.extend(get_valid_dig_actions_for(farm, unit_pos))
         actions.extend(get_valid_build_actions_for(farm, unit_pos))
-        actions.extend(get_valid_feed_actions_for(player, unit_pos))
+        actions.extend(get_valid_feed_actions_for(self, unit_pos))
         actions.extend(get_valid_collect_fertilizer_actions_for(farm, unit_pos))
         actions.extend(get_valid_care_actions_for(farm, unit_pos))
-        actions.extend(get_valid_pickup_actions_for(player, unit_pos, inv_index))
-        actions.extend(get_valid_place_actions_for(player, unit_pos, inv_index))
+        actions.extend(get_valid_pickup_actions_for(self, unit_pos, inv_index))
+        actions.extend(get_valid_place_actions_for(self, unit_pos, inv_index))
         return actions
 
-    def get_valid_actions(self) -> list[ActionState]:
-        actions: list[ActionState] = list(self.get_valid_pass_actions())
+    def get_valid_actions(self) -> ValidStepsState:
         farm = self.farms[self.player]
-        actions.extend(self.get_valid_farm_actions_for(farm.farmer, 0))
+        farmer = self.get_valid_farm_actions_for(farm.farmer, 0)
+
+        hands: list[list[ActionState]] = []
         for h, hand_pos in enumerate(farm.hands):
-            actions.extend(self.get_valid_farm_actions_for(hand_pos, h + 1))
-        return actions
+            hands.append(self.get_valid_farm_actions_for(hand_pos, h + 1))
+
+        market = self.get_valid_market_actions()
+        return ValidStepsState(farmer=farmer, hands=hands, market=market)
+
+    def random_play(self) -> StepState:
+        actions = self.get_valid_actions()
+        farmer = random.choice(actions.farmer) if actions.farmer else PassActionState()
+        hands = [
+            random.choice(acts) if acts else PassActionState()
+            for acts in actions.hands
+        ]
+        market = random.choices(actions.market, k=MAX_MARKET_ORDERS_PER_TURN) if actions.market else []
+        step = StepState(farmer=farmer, hands=hands, market=market)
+        return step
 
     def play(self) -> StepState:
-        farmActions = self.get_valid_actions()
-        marketActions = self.get_valid_market_actions()
-
-        print(farmActions, "\n", marketActions)
+        if self.method == 'RANDOM':
+            return self.random_play()
+        
         return StepState()
 
 

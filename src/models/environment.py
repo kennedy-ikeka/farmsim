@@ -9,6 +9,24 @@ from src.models.game import GameState, SharedRealityState
 from src.models.event import EventState
 
 
+class ValidStepsState(BaseModel):
+    """The next set of actions for the farm."""
+    
+    farmer: list[FarmActionState] = Field(
+        default_factory=list,
+        description="The farmer's valid actions."
+    )
+
+    hands: list[list[FarmActionState]] = Field(
+        default_factory=list,
+        description="The valid actions assinable to hired workers. Empty list if no hand should act."
+    )
+
+    market: list[MarketActionState] = Field(
+        default_factory=list,
+        description="The valid market actions. Empty list if no market actions is needed."
+    )
+
 class StepState(BaseModel):
     """The next set of actions for the farm."""
 

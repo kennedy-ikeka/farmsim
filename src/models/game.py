@@ -12,6 +12,7 @@ from src.models.town import TownState
 PLAN_STATUS = Literal["PENDING", 'ACTIVE', 'COMPLETED', 'BLOCKED', 'ABANDONED']
 TARGET_METRICS = Literal["MONEY"]
 TARGET_OPERATIONS = Literal["EQ", "GTE", "LTE", "GT", "LT"]
+PLAY_METHODS = Literal["RANDOM", "BEST_CHOISE"]
 
 class GameState(BaseModel):
     """Full two-player game state — the authoritative world the controllers mutate.
@@ -76,6 +77,7 @@ class RealityState(GameState):
         default_factory=PrivateState, 
         description='Current players private state'
     )
+    method: PLAY_METHODS = Field('RANDOM', description="The players method")
 
 
 class SharedRealityState(GameState):
