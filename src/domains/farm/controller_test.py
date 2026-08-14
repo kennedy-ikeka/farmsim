@@ -22,6 +22,7 @@ from src.models.action import (
     WaterActionState,
 )
 from src.models.farm import PlantState, WeedState, AnimalState
+from src.models.player import InventoryState
 
 
 class TestFarmController:
@@ -195,7 +196,7 @@ class TestFarmApply:
         env.state.privates[0].shed.WHEAT = 2
         farm.apply(env.state, [4, 4], PickupActionState(type="PICKUP", item="WHEAT", count=1), 0)
         assert env.state.privates[0].shed.WHEAT == 1
-        assert env.state.privates[0].inventories[0]["WHEAT"] == 1
+        assert env.state.privates[0].inventories[0].WHEAT == 1
 
     # ---------------------------------------------------------------------------
     # PLACE dispatches to place.
@@ -205,11 +206,11 @@ class TestFarmApply:
         # Drop an item back into the shed from the farmer's inventory.
         env = _make_env(farmer=(4, 4))
         farm = env.state.farms[0]
-        env.state.privates[0].inventories = [{"WHEAT": 1}]
+        env.state.privates[0].inventories = [InventoryState(WHEAT=1)]
         env.state.privates[0].shed.WHEAT = 0
         farm.apply(env.state, [4, 4], PlaceActionState(type="PLACE", item="WHEAT", count=1), 0)
         assert env.state.privates[0].shed.WHEAT == 1
-        assert env.state.privates[0].inventories[0]["WHEAT"] == 0
+        assert env.state.privates[0].inventories[0].WHEAT == 0
 
     # ---------------------------------------------------------------------------
     # Unsupported action raises ValueError.

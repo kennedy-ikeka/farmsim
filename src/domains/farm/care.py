@@ -1,4 +1,6 @@
 from src.models.farm import AnimalState
+from src.models.action import CareActionState
+from src.utils.farm import in_bounds
 
 
 def care(farm, unit_pos, action) -> dict:
@@ -32,3 +34,21 @@ def care(farm, unit_pos, action) -> dict:
 
     tile.cared_today = True
     return {"position": [row, col], "animal": tile.animal, "cared": True}
+
+
+def get_valid_care_actions_for(farm, unit_pos) -> list[CareActionState]:
+    """Valid CARE actions for a unit at `unit_pos` ([row, col]).
+
+    Valid iff the unit is in bounds, the tile is an occupied animal structure
+    that hasn't been cared for today.
+    """
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    tile = farm.tiles[row][col]
+    if not isinstance(tile, AnimalState) or tile.animal is None:
+        return []
+    if tile.cared_today:
+        return []
+    return [CareActionState(type="CARE")]

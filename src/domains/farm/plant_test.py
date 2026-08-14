@@ -2,7 +2,8 @@ import pytest
 
 from src.utils.config import TURNS_PER_DAY
 from tests.fixtures import _make_env, _play
-from src.domains.farm.plant import plant
+from src.domains.farm.plant import plant, get_valid_plant_actions_for
+from src.domains.player.player import Player
 from src.models.crops import CROP_CONFIG
 from src.models.action import PlantActionState
 from src.models.environment import StepState
@@ -176,3 +177,60 @@ class TestPlantDispatch:
         _play(env, step)
         assert env.state.farms[0].tiles[5][5] == "LOCKED"
         assert env.state.privates[0].seeds.WHEAT == 1  # not consumed
+
+
+def _player_from(env):
+    """Build a Player (RealityState) view from env's shared state (player 0)."""
+    shared = env.state.model_dump(exclude={"privates", "player"}, mode="json")
+    return Player(**shared, player=0, private=env.state.privates[0])
+
+
+class TestGetValidPlantActionsFor:
+    """Tests for `get_valid_plant_actions_for`."""
+
+    @pytest.mark.parametrize("bad_pos", [None, [5]])
+    def test_malformed_position_returns_empty(self, bad_pos):
+        env = _make_env(farmer=(5, 5), seeds={"WHEAT": 2})
+        player = _player_from(env)
+        assert get_valid_plant_actions_for(player, bad_pos) == []
+
+    def test_out_of_bounds_returns_empty(self):
+        env = _make_env(rows=5, cols=5, farmer=(4, 4), seeds={"WHEAT": 2})
+        player = _player_from(env)
+        assert get_valid_plant_actions_for(player, [5, 0]) == []
+
+    def test_empty_tile_no_seeds_returns_empty(self):
+        env = _make_env(farmer=(5, 5), seeds={"WHEAT": 0})
+        player = _player_from(env)
+        assert get_valid_plant_actions_for(player, [5, 5]) == []
+
+    def test_empty_tile_with_wheat_seeds_returns_one_action(self):
+        env = _make_env(farmer=(5, 5), seeds={"WHEAT": 2})
+        player = _player_from(env)
+        actions = get_valid_plant_actions_for(player, [5, 5])
+        assert len(actions) == 1
+        assert actions[0] == PlantActionState(type="PLANT", crop="WHEAT")
+
+    def test_empty_tile_multiple_seed_types_returns_one_per_type(self):
+        env = _make_env(farmer=(5, 5), seeds={"WHEAT": 2, "CARROT": 1, "TOMATO": 3})
+        player = _player_from(env)
+        actions = get_valid_plant_actions_for(player, [5, 5])
+        crops = sorted(a.crop for a in actions)
+        assert crops == ["CARROT", "TOMATO", "WHEAT"]
+        for a in actions:
+            assert a.type == "PLANT"
+
+    def test_occupied_plant_tile_returns_empty(self):
+        env = _make_env(farmer=(5, 5), seeds={"WHEAT": 2})
+        env.state.farms[0].tiles[5][5] = PlantState(
+            crop="CARROT", planted_day=0, max_lifespan_step=0
+        )
+        player = _player_from(env)
+        assert get_valid_plant_actions_for(player, [5, 5]) == []
+
+    def test_locked_tile_returns_empty(self):
+        tiles = [[None] * 10 for _ in range(10)]
+        tiles[5][5] = "LOCKED"
+        env = _make_env(farmer=(5, 5), seeds={"WHEAT": 2}, tiles=tiles)
+        player = _player_from(env)
+        assert get_valid_plant_actions_for(player, [5, 5]) == []

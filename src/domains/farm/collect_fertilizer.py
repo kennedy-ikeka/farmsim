@@ -1,4 +1,6 @@
 from src.models.farm import AnimalState
+from src.models.action import CollectFertilizerActionState
+from src.utils.farm import in_bounds
 
 
 def collect_fertilizer(state, farm, unit_pos, action) -> dict:
@@ -36,3 +38,21 @@ def collect_fertilizer(state, farm, unit_pos, action) -> dict:
     tile.fertilizer_available = 0
     state.privates[state.player].shed.FERTILIZER += 1
     return {"position": [row, col], "animal": tile.animal, "collected": 1}
+
+
+def get_valid_collect_fertilizer_actions_for(farm, unit_pos) -> list[CollectFertilizerActionState]:
+    """Valid COLLECT_FERTILIZER actions for a unit at `unit_pos` ([row, col]).
+
+    Valid iff the unit is in bounds, the tile is an occupied animal structure
+    with fertilizer available to collect.
+    """
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    tile = farm.tiles[row][col]
+    if not isinstance(tile, AnimalState) or tile.animal is None:
+        return []
+    if tile.fertilizer_available <= 0:
+        return []
+    return [CollectFertilizerActionState(type="COLLECT_FERTILIZER")]

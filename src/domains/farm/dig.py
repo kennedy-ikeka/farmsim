@@ -1,5 +1,6 @@
 from src.models.action import DigActionState
 from src.models.farm import PlantState, WeedState, AnimalState
+from src.utils.farm import in_bounds
 
 
 def dig(farm, unit_pos, action: DigActionState) -> dict:
@@ -39,3 +40,24 @@ def dig(farm, unit_pos, action: DigActionState) -> dict:
         farm.tiles[row][col] = None
         return {"position": [row, col], "cleared": True, "kind": kind}
     return {"position": [row, col], "cleared": False, "kind": None}
+
+
+def get_valid_dig_actions_for(farm, unit_pos) -> list[DigActionState]:
+    """Valid DIG actions for a unit at `unit_pos` ([row, col]).
+
+    DIG is valid iff the unit is in bounds and the tile is a plant, a weed, or
+    an empty (animal-less) structure. Empty tiles, locked tiles, and occupied
+    structures are not diggable.
+    """
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    tile = farm.tiles[row][col]
+    if tile is None or tile == "LOCKED":
+        return []
+    if isinstance(tile, (PlantState, WeedState)):
+        return [DigActionState(type="DIG")]
+    if isinstance(tile, AnimalState) and tile.animal is None:
+        return [DigActionState(type="DIG")]
+    return []

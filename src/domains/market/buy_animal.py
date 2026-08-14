@@ -23,3 +23,17 @@ def buy_animal(state, action: BuyAnimalActionState) -> dict:
     shed = state.privates[state.player].shed
     setattr(shed, action.animal, getattr(shed, action.animal, 0) + count)
     return {"animal": action.animal, "count": count, "unit_cost": cost, "cost": count * cost}
+
+
+def get_valid_buy_animal_actions(player) -> list[BuyAnimalActionState]:
+    """Valid BUY_ANIMAL actions — one per animal the farm can afford.
+
+    BUY_ANIMAL no-ops when `farm.money < cost`. Animals have unlimited market
+    supply. Returns `count=1` per viable animal.
+    """
+    farm = player.farms[player.player]
+    return [
+        BuyAnimalActionState(type="BUY_ANIMAL", animal=animal, count=1)
+        for animal, cfg in ANIMAL_CONFIG.items()
+        if farm.money >= cfg["cost"]
+    ]

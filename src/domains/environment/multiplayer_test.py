@@ -12,6 +12,7 @@ from src.models.action import (
 from src.models.environment import StepState
 from src.models.farm import PlantState, WeedState
 from src.utils.config import TURNS_PER_DAY
+from src.models.player import InventoryState
 
 
 class TestStepMultiplayer:
@@ -163,7 +164,7 @@ class TestEndOfDay:
         env = _make_env(farmer=(4, 4), hands=[[5, 4]], step=TURNS_PER_DAY - 1, players=2)
         env.state.farms[0].hires_today = 1
         # Give the hand (index 1) some wheat.
-        env.state.privates[0].inventories = [{}, {"WHEAT": 2}]
+        env.state.privates[0].inventories = [InventoryState(), InventoryState(WHEAT=2)]
         env.step()
         assert env.state.privates[0].shed.WHEAT == 2
         # Inventories truncated to just the farmer's (length 1).
@@ -173,9 +174,9 @@ class TestEndOfDay:
     def test_farmer_keeps_inventory(self):
         """The main farmer's inventory persists across the day rollover."""
         env = _make_env(farmer=(4, 4), step=TURNS_PER_DAY - 1, players=2)
-        env.state.privates[0].inventories = [{"WHEAT": 3}]
+        env.state.privates[0].inventories = [InventoryState(WHEAT=3)]
         env.step()
-        assert env.state.privates[0].inventories[0] == {"WHEAT": 3}
+        assert env.state.privates[0].inventories[0].WHEAT == 3
 
 
 class TestStepResult:

@@ -1,7 +1,8 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.farm.harvest import harvest
+from src.domains.farm.harvest import harvest, get_valid_harvest_actions_for
+from src.domains.player.player import Player
 from src.models.crops import CROP_CONFIG
 from src.models.action import HarvestActionState
 from src.models.environment import StepState
@@ -268,3 +269,63 @@ class TestHarvestDispatch:
         assert isinstance(tile, PlantState)
         assert tile.yield_units == 2
         assert env.state.privates[0].shed.WHEAT == 0
+
+
+def _player_from(env):
+    """Build a Player (RealityState) view from env's shared state (player 0)."""
+    shared = env.state.model_dump(exclude={"privates", "player"}, mode="json")
+    return Player(**shared, player=0, private=env.state.privates[0])
+
+
+class TestGetValidHarvestActionsFor:
+    """Tests for `get_valid_harvest_actions_for`."""
+
+    @pytest.mark.parametrize("bad_pos", [None, [5]])
+    def test_malformed_position_returns_empty(self, bad_pos):
+        env = _make_env(farmer=(5, 5), day=2)
+        env.state.farms[0].tiles[5][5] = _plant_on_tile(
+            crop="WHEAT", planted_day=0, yield_units=2
+        )
+        player = _player_from(env)
+        assert get_valid_harvest_actions_for(player, bad_pos) == []
+
+    def test_out_of_bounds_returns_empty(self):
+        env = _make_env(rows=5, cols=5, farmer=(4, 4), day=2)
+        env.state.farms[0].tiles[4][4] = _plant_on_tile(
+            crop="WHEAT", planted_day=0, yield_units=2
+        )
+        player = _player_from(env)
+        assert get_valid_harvest_actions_for(player, [5, 0]) == []
+
+    def test_empty_tile_returns_empty(self):
+        env = _make_env(farmer=(5, 5), day=2)
+        player = _player_from(env)
+        assert get_valid_harvest_actions_for(player, [5, 5]) == []
+
+    def test_immature_plant_returns_empty(self):
+        """WHEAT first_yield_day=2; planted_day=0, day=1 is not yet mature."""
+        env = _make_env(farmer=(5, 5), day=1)
+        env.state.farms[0].tiles[5][5] = _plant_on_tile(
+            crop="WHEAT", planted_day=0, yield_units=2
+        )
+        player = _player_from(env)
+        assert get_valid_harvest_actions_for(player, [5, 5]) == []
+
+    def test_mature_plant_with_zero_yield_returns_empty(self):
+        env = _make_env(farmer=(5, 5), day=2)
+        env.state.farms[0].tiles[5][5] = _plant_on_tile(
+            crop="WHEAT", planted_day=0, yield_units=0
+        )
+        player = _player_from(env)
+        assert get_valid_harvest_actions_for(player, [5, 5]) == []
+
+    def test_mature_plant_with_yield_returns_one_action(self):
+        env = _make_env(farmer=(5, 5), day=2)
+        env.state.farms[0].tiles[5][5] = _plant_on_tile(
+            crop="WHEAT", planted_day=0, yield_units=3
+        )
+        player = _player_from(env)
+        actions = get_valid_harvest_actions_for(player, [5, 5])
+        assert len(actions) == 1
+        assert isinstance(actions[0], HarvestActionState)
+        assert actions[0].type == "HARVEST"

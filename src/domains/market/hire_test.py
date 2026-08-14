@@ -1,7 +1,8 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.market.hire import hire, _fib
+from src.domains.market.hire import hire, _fib, get_valid_hire_actions
+from src.domains.player.player import Player
 from src.models.action import HireActionState, PassActionState
 from src.models.environment import StepState
 
@@ -144,3 +145,71 @@ class TestHireDispatch:
         assert len(farm.hands) == 1
         assert farm.hands[0] == [5, 4]
         assert farm.money == 49.0
+
+
+class TestGetValidHireActions:
+    """Tests for `get_valid_hire_actions`."""
+
+    # ---------------------------------------------------------------------------
+    # Cannot afford — cost is _fib(hires_today); _fib(0)=1.
+    # ---------------------------------------------------------------------------
+
+    def test_no_money_cannot_afford(self):
+        player = Player().build(money=0, hires_today=0)
+        assert get_valid_hire_actions(player) == []
+
+    # ---------------------------------------------------------------------------
+    # Exactly affords the first hire — _fib(0)=1, money=1.
+    # ---------------------------------------------------------------------------
+
+    def test_exact_money_first_hire(self):
+        player = Player().build(money=1, hires_today=0)
+        actions = get_valid_hire_actions(player)
+        assert len(actions) == 1
+        assert actions[0].type == "HIRE"
+
+    # ---------------------------------------------------------------------------
+    # Second hire also costs 1 — _fib(1)=1, money=1 suffices.
+    # ---------------------------------------------------------------------------
+
+    def test_exact_money_second_hire(self):
+        player = Player().build(money=1, hires_today=1)
+        actions = get_valid_hire_actions(player)
+        assert len(actions) == 1
+        assert actions[0].type == "HIRE"
+
+    # ---------------------------------------------------------------------------
+    # Third hire costs 2 — _fib(2)=2, money=1 cannot afford.
+    # ---------------------------------------------------------------------------
+
+    def test_one_money_cannot_afford_third_hire(self):
+        player = Player().build(money=1, hires_today=2)
+        assert get_valid_hire_actions(player) == []
+
+    # ---------------------------------------------------------------------------
+    # Fifth hire costs 5 — _fib(4)=5, money=5 exactly affords.
+    # ---------------------------------------------------------------------------
+
+    def test_exact_money_fifth_hire(self):
+        player = Player().build(money=5, hires_today=4)
+        actions = get_valid_hire_actions(player)
+        assert len(actions) == 1
+        assert actions[0].type == "HIRE"
+
+    # ---------------------------------------------------------------------------
+    # One short of the fifth hire — money=4 < cost=5.
+    # ---------------------------------------------------------------------------
+
+    def test_one_short_of_fifth_hire(self):
+        player = Player().build(money=4, hires_today=4)
+        assert get_valid_hire_actions(player) == []
+
+    # ---------------------------------------------------------------------------
+    # Every returned action has type="HIRE".
+    # ---------------------------------------------------------------------------
+
+    def test_each_action_has_type_hire(self):
+        player = Player().build(money=10, hires_today=0)
+        actions = get_valid_hire_actions(player)
+        for a in actions:
+            assert a.type == "HIRE"

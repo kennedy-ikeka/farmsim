@@ -23,7 +23,8 @@ def drop_hand_inventories_to_shed(farm: FarmState, priv: PrivateState,
         if i >= len(priv.inventories):
             break
         inv = priv.inventories[i]
-        for item, count in list(inv.items()):
+        for item in type(inv).model_fields:
+            count = getattr(inv, item, 0)
             if count <= 0:
                 continue
             total_in_shed = sum(getattr(priv.shed, f) for f in type(priv.shed).model_fields)
@@ -34,4 +35,4 @@ def drop_hand_inventories_to_shed(farm: FarmState, priv: PrivateState,
             if not hasattr(priv.shed, item):
                 continue  # not a valid shed field
             setattr(priv.shed, item, getattr(priv.shed, item, 0) + to_move)
-            inv[item] = count - to_move
+            setattr(inv, item, count - to_move)

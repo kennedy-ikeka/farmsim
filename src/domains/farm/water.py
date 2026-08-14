@@ -1,9 +1,9 @@
 import math
 
-from src.models.game import RealityState
 from src.models.crops import CROP_CONFIG
 from src.models.action import WaterActionState
 from src.models.farm import PlantState
+from src.utils.farm import in_bounds
 
 
 def water(state, farm, unit_pos) -> dict:
@@ -58,11 +58,17 @@ def water(state, farm, unit_pos) -> dict:
     return {"position": [row, col], "watered": True, "bonus": bonus}
 
 
-def get_valid_water_actions(state: RealityState):
-    actions: list[WaterActionState] = []
-    farm = state.farms[state.player]
-    
-    for tile in farm.tiles:
-        if isinstance(tile, PlantState) and not tile.watered_today:
-            actions.append(WaterActionState())
-    return actions
+def get_valid_water_actions_for(farm, unit_pos) -> list[WaterActionState]:
+    """Valid WATER actions for a unit at `unit_pos` ([row, col]).
+
+    WATER is valid iff the unit is in bounds, the tile holds a plant, and that
+    plant has not already been watered today.
+    """
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    tile = farm.tiles[row][col]
+    if isinstance(tile, PlantState) and not tile.watered_today:
+        return [WaterActionState(type="WATER")]
+    return []

@@ -1,7 +1,8 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.market.buy_land import buy_land, QUADRANT_COST
+from src.domains.market.buy_land import buy_land, QUADRANT_COST, get_valid_buy_land_actions
+from src.domains.player.player import Player
 from src.models.action import BuyLandActionState, PassActionState
 from src.models.environment import StepState
 from src.models.farm import WeedState
@@ -160,3 +161,69 @@ class TestBuyLandDispatch:
         assert "NE" in farm.unlocked_quadrants
         assert farm.money == 5000.0 - QUADRANT_COST["NE"]
         assert farm.tiles[0][5] is None  # NE unlocked
+
+
+class TestGetValidBuyLandActions:
+    """Tests for `get_valid_buy_land_actions`."""
+
+    # ---------------------------------------------------------------------------
+    # NE is the first buyable quadrant (cost 1000).
+    # ---------------------------------------------------------------------------
+
+    def test_no_money_cannot_afford_ne(self):
+        player = Player().build(money=0, unlocked_quadrants=["NW"])
+        assert get_valid_buy_land_actions(player) == []
+
+    def test_exact_money_buys_ne(self):
+        player = Player().build(money=1000, unlocked_quadrants=["NW"])
+        actions = get_valid_buy_land_actions(player)
+        assert len(actions) == 1
+        assert actions[0].type == "BUY_LAND"
+
+    def test_one_short_of_ne(self):
+        player = Player().build(money=999, unlocked_quadrants=["NW"])
+        assert get_valid_buy_land_actions(player) == []
+
+    # ---------------------------------------------------------------------------
+    # SW is next (cost 2000) once NE is unlocked.
+    # ---------------------------------------------------------------------------
+
+    def test_cannot_afford_sw(self):
+        player = Player().build(money=1000, unlocked_quadrants=["NW", "NE"])
+        assert get_valid_buy_land_actions(player) == []
+
+    def test_exact_money_buys_sw(self):
+        player = Player().build(money=2000, unlocked_quadrants=["NW", "NE"])
+        actions = get_valid_buy_land_actions(player)
+        assert len(actions) == 1
+        assert actions[0].type == "BUY_LAND"
+
+    # ---------------------------------------------------------------------------
+    # All quadrants unlocked — no next quadrant to buy.
+    # ---------------------------------------------------------------------------
+
+    def test_all_unlocked_returns_empty(self):
+        player = Player().build(money=10000,
+                                   unlocked_quadrants=["NW", "NE", "SW", "SE"])
+        assert get_valid_buy_land_actions(player) == []
+
+    # ---------------------------------------------------------------------------
+    # SE is last (cost 4000) once NW, NE, SW are unlocked.
+    # ---------------------------------------------------------------------------
+
+    def test_exact_money_buys_se(self):
+        player = Player().build(money=4000,
+                                   unlocked_quadrants=["NW", "NE", "SW"])
+        actions = get_valid_buy_land_actions(player)
+        assert len(actions) == 1
+        assert actions[0].type == "BUY_LAND"
+
+    # ---------------------------------------------------------------------------
+    # Every returned action has type="BUY_LAND".
+    # ---------------------------------------------------------------------------
+
+    def test_each_action_has_type_buy_land(self):
+        player = Player().build(money=1000, unlocked_quadrants=["NW"])
+        actions = get_valid_buy_land_actions(player)
+        for a in actions:
+            assert a.type == "BUY_LAND"

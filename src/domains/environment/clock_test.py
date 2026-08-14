@@ -10,6 +10,7 @@ from src.utils.config import (
     TURNS_PER_DAY,
     WEED_SPAWN_CHANCE,
 )
+from src.models.player import InventoryState
 
 
 def _rng(seed=0):
@@ -243,7 +244,7 @@ class TestEndOfDayRefresh:
     def test_drops_hand_inventory_to_shed(self):
         env = _make_env(farmer=(5, 5), hands=[[5, 4]], players=2)
         env.state.farms[0].hires_today = 1
-        env.state.privates[0].inventories = [{}, {"WHEAT": 2}]
+        env.state.privates[0].inventories = [InventoryState(), InventoryState(WHEAT=2)]
         env.clock.end_of_day_refresh(env.state, _rng())
         assert env.state.privates[0].shed.WHEAT == 2
         # Hand gone; inventories truncated to len 1 (farmer only).
@@ -256,20 +257,20 @@ class TestEndOfDayRefresh:
         env.state.farms[0].hires_today = 1
         # Pre-fill shed with 4 carrots; hand has 3 wheat → only 1 fits.
         env.state.privates[0].shed.CARROT = 4
-        env.state.privates[0].inventories = [{}, {"WHEAT": 3}]
+        env.state.privates[0].inventories = [InventoryState(), InventoryState(WHEAT=3)]
         env.clock.end_of_day_refresh(env.state, _rng())
         assert env.state.privates[0].shed.WHEAT == 1  # 5 capacity - 4 carrot = 1 space
 
     def test_farmer_keeps_inventory(self):
         env = _make_env(farmer=(5, 5), players=2)
-        env.state.privates[0].inventories = [{"WHEAT": 3}]
+        env.state.privates[0].inventories = [InventoryState(WHEAT=3)]
         env.clock.end_of_day_refresh(env.state, _rng())
-        assert env.state.privates[0].inventories[0] == {"WHEAT": 3}
+        assert env.state.privates[0].inventories[0].WHEAT == 3
 
     def test_truncates_inventories_to_farmer_only(self):
         env = _make_env(farmer=(5, 5), hands=[[5, 4], [5, 3]], players=2)
         env.state.farms[0].hires_today = 2
-        env.state.privates[0].inventories = [{}, {"WHEAT": 2}, {"EGG": 1}]
+        env.state.privates[0].inventories = [InventoryState(), InventoryState(WHEAT=2), InventoryState(EGG=1)]
         env.clock.end_of_day_refresh(env.state, _rng())
         assert len(env.state.privates[0].inventories) == 1
         assert env.state.privates[0].shed.WHEAT == 2

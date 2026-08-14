@@ -3,7 +3,7 @@ import math
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.farm.water import water
+from src.domains.farm.water import water, get_valid_water_actions_for
 from src.models.crops import CROP_CONFIG
 from src.models.action import WaterActionState
 from src.models.environment import StepState
@@ -265,3 +265,46 @@ class TestWaterDispatch:
         tile = env.state.farms[0].tiles[3][3]
         assert tile.watered_today is True
         assert tile.yield_units == 1  # day 3 is in the WHEAT window [2, 4]
+
+
+class TestGetValidWaterActionsFor:
+    """Tests for `get_valid_water_actions_for`."""
+
+    @pytest.mark.parametrize("bad_pos", [None, [5]])
+    def test_malformed_position_returns_empty(self, bad_pos):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _plant_on_tile()
+        assert get_valid_water_actions_for(farm, bad_pos) == []
+
+    def test_out_of_bounds_returns_empty(self):
+        env = _make_env(rows=5, cols=5, farmer=(4, 4))
+        farm = env.state.farms[0]
+        farm.tiles[4][4] = _plant_on_tile(crop="WHEAT", planted_day=0)
+        assert get_valid_water_actions_for(farm, [5, 0]) == []
+
+    def test_empty_tile_returns_empty(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        assert get_valid_water_actions_for(farm, [5, 5]) == []
+
+    def test_unwatered_plant_returns_one_action(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _plant_on_tile(watered_today=False)
+        actions = get_valid_water_actions_for(farm, [5, 5])
+        assert len(actions) == 1
+        assert isinstance(actions[0], WaterActionState)
+        assert actions[0].type == "WATER"
+
+    def test_already_watered_plant_returns_empty(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _plant_on_tile(watered_today=True)
+        assert get_valid_water_actions_for(farm, [5, 5]) == []
+
+    def test_weed_tile_returns_empty(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = WeedState()
+        assert get_valid_water_actions_for(farm, [5, 5]) == []

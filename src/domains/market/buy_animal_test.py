@@ -1,7 +1,8 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.market.buy_animal import buy_animal
+from src.domains.market.buy_animal import buy_animal, get_valid_buy_animal_actions
+from src.domains.player.player import Player
 from src.models.animals import ANIMAL_CONFIG
 from src.models.action import BuyAnimalActionState, PassActionState
 from src.models.environment import StepState
@@ -107,3 +108,35 @@ class TestBuyAnimalDispatch:
 
         assert env.state.privates[0].shed.GOOSE == 2
         assert farm.money == 1000.0 - 2 * ANIMAL_CONFIG["GOOSE"]["cost"]
+
+
+
+class TestGetValidBuyAnimalActions:
+    """Tests for `get_valid_buy_animal_actions`."""
+
+    def test_no_actions_when_broke(self):
+        player = Player().build(money=0)
+        assert get_valid_buy_animal_actions(player) == []
+
+    def test_only_cheapest_when_minimal_money(self):
+        player = Player().build(money=300)
+        actions = get_valid_buy_animal_actions(player)
+        assert [a.animal for a in actions] == ["GOOSE"]
+
+    def test_all_animals_when_rich(self):
+        player = Player().build(money=500)
+        actions = get_valid_buy_animal_actions(player)
+        assert sorted(a.animal for a in actions) == ["COW", "GOOSE", "SHEEP"]
+
+    def test_partial_set_at_400(self):
+        # 400 >= GOOSE(300), COW(400) but not SHEEP(500).
+        player = Player().build(money=400)
+        actions = get_valid_buy_animal_actions(player)
+        assert sorted(a.animal for a in actions) == ["COW", "GOOSE"]
+
+    def test_each_action_has_type_and_count(self):
+        player = Player().build(money=500)
+        actions = get_valid_buy_animal_actions(player)
+        for a in actions:
+            assert a.type == "BUY_ANIMAL"
+            assert a.count == 1

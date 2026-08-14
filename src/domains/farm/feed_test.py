@@ -1,7 +1,8 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.farm.feed import feed
+from src.domains.farm.feed import feed, get_valid_feed_actions_for
+from src.domains.player.player import Player
 from src.models.action import FeedActionState
 from src.models.environment import StepState
 from src.models.farm import AnimalState, PlantState, WeedState
@@ -130,3 +131,55 @@ class TestFeedDispatch:
 
         assert env.state.farms[0].tiles[3][3].fed_today is True
         assert env.state.privates[0].shed.WHEAT == 1
+
+
+class TestGetValidFeedActionsFor:
+    """Tests for `get_valid_feed_actions_for`."""
+
+    @pytest.mark.parametrize("bad_pos", [None, [5], [], [5, 5, 0]])
+    def test_malformed_position_returns_empty(self, bad_pos):
+        player = Player().build(farmer=(5, 5))
+        assert get_valid_feed_actions_for(player, bad_pos) == []
+
+    def test_out_of_bounds_returns_empty(self):
+        player = Player().build(rows=5, cols=5, farmer=(4, 4))
+        assert get_valid_feed_actions_for(player, [5, 0]) == []
+
+    def test_empty_tile_returns_empty(self):
+        player = Player().build(farmer=(5, 5), shed={"WHEAT": 1})
+        assert get_valid_feed_actions_for(player, [5, 5]) == []
+
+    def test_empty_structure_returns_empty(self):
+        tiles = [[None] * 10 for _ in range(10)]
+        tiles[5][5] = AnimalState(kind="COOP", animal=None)
+        player = Player().build(farmer=(5, 5), tiles=tiles, shed={"WHEAT": 1})
+        assert get_valid_feed_actions_for(player, [5, 5]) == []
+
+    def test_occupied_coop_no_wheat_returns_empty(self):
+        tiles = [[None] * 10 for _ in range(10)]
+        tiles[5][5] = _structure(kind="COOP", animal="GOOSE")
+        player = Player().build(farmer=(5, 5), tiles=tiles, shed={"WHEAT": 0})
+        assert get_valid_feed_actions_for(player, [5, 5]) == []
+
+    def test_occupied_coop_with_wheat_returns_feed(self):
+        tiles = [[None] * 10 for _ in range(10)]
+        tiles[5][5] = _structure(kind="COOP", animal="GOOSE")
+        player = Player().build(farmer=(5, 5), tiles=tiles, shed={"WHEAT": 1})
+        actions = get_valid_feed_actions_for(player, [5, 5])
+        assert len(actions) == 1
+        assert isinstance(actions[0], FeedActionState)
+        assert actions[0].type == "FEED"
+
+    def test_already_fed_returns_empty(self):
+        tiles = [[None] * 10 for _ in range(10)]
+        tiles[5][5] = _structure(kind="COOP", animal="GOOSE", fed_today=True)
+        player = Player().build(farmer=(5, 5), tiles=tiles, shed={"WHEAT": 1})
+        assert get_valid_feed_actions_for(player, [5, 5]) == []
+
+    def test_occupied_pasture_with_wheat_returns_feed(self):
+        tiles = [[None] * 10 for _ in range(10)]
+        tiles[5][5] = _structure(kind="PASTURE", animal="COW")
+        player = Player().build(farmer=(5, 5), tiles=tiles, shed={"WHEAT": 1})
+        actions = get_valid_feed_actions_for(player, [5, 5])
+        assert len(actions) == 1
+        assert isinstance(actions[0], FeedActionState)

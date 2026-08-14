@@ -1,7 +1,8 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.market.buy_product import buy_product
+from src.domains.market.buy_product import buy_product, get_valid_buy_product_actions
+from src.domains.player.player import Player
 from src.models.action import BuyProductActionState, PassActionState
 from src.models.environment import StepState
 
@@ -146,3 +147,62 @@ class TestBuyProductDispatch:
         assert env.state.market.inventory.FERTILIZER == 48
         assert env.state.privates[0].shed.FERTILIZER == 2
         assert farm.money == 300.0
+
+
+class TestGetValidBuyProductActions:
+    """Tests for `get_valid_buy_product_actions`."""
+
+    def test_empty_market_returns_nothing(self):
+        # _make_env defaults all market inventory to 0, so nothing is buyable.
+        player = Player().build(money=3000)
+        assert get_valid_buy_product_actions(player) == []
+
+    def test_both_items_in_stock_and_affordable(self):
+        player = Player().build(
+            money=3000,
+            market_inventory={"WHEAT": 100, "FERTILIZER": 50},
+            market_prices={"WHEAT": 25, "FERTILIZER": 100},
+        )
+        actions = get_valid_buy_product_actions(player)
+        assert sorted(a.item for a in actions) == ["FERTILIZER", "WHEAT"]
+
+    def test_only_affordable_item(self):
+        # money=50 affords WHEAT at 25 but not FERTILIZER at 100.
+        player = Player().build(
+            money=50,
+            market_inventory={"WHEAT": 100, "FERTILIZER": 50},
+            market_prices={"WHEAT": 25, "FERTILIZER": 100},
+        )
+        actions = get_valid_buy_product_actions(player)
+        assert [a.item for a in actions] == ["WHEAT"]
+
+    def test_zero_price_excluded(self):
+        # price must be > 0; WHEAT at price=0 is filtered out.
+        player = Player().build(
+            money=3000,
+            market_inventory={"WHEAT": 100, "FERTILIZER": 50},
+            market_prices={"WHEAT": 0, "FERTILIZER": 100},
+        )
+        actions = get_valid_buy_product_actions(player)
+        assert [a.item for a in actions] == ["FERTILIZER"]
+
+    def test_zero_inventory_excluded(self):
+        # inventory must be > 0; FERTILIZER out of stock is filtered out.
+        player = Player().build(
+            money=3000,
+            market_inventory={"WHEAT": 100, "FERTILIZER": 0},
+            market_prices={"WHEAT": 25, "FERTILIZER": 100},
+        )
+        actions = get_valid_buy_product_actions(player)
+        assert [a.item for a in actions] == ["WHEAT"]
+
+    def test_each_action_has_type_and_count(self):
+        player = Player().build(
+            money=3000,
+            market_inventory={"WHEAT": 100, "FERTILIZER": 50},
+            market_prices={"WHEAT": 25, "FERTILIZER": 100},
+        )
+        actions = get_valid_buy_product_actions(player)
+        for a in actions:
+            assert a.type == "BUY_PRODUCT"
+            assert a.count == 1

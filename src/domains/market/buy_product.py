@@ -1,4 +1,7 @@
+from typing import get_args
+
 from src.models.action import BuyProductActionState
+from src.models.objects import BUYABLE_PRODUCTS
 
 
 def buy_product(state, action: BuyProductActionState) -> dict:
@@ -30,3 +33,21 @@ def buy_product(state, action: BuyProductActionState) -> dict:
     shed = state.privates[state.player].shed
     setattr(shed, item, getattr(shed, item, 0) + count)
     return {"item": item, "count": count, "price": price, "cost": count * price}
+
+
+def get_valid_buy_product_actions(player) -> list[BuyProductActionState]:
+    """Valid BUY_PRODUCT actions — one per buyable product the farm can afford.
+
+    BUY_PRODUCT no-ops when `price <= 0`, the market is out of stock
+    (`inventory <= 0`), or `farm.money < price`. Returns `count=1` per viable
+    item (only WHEAT and FERTILIZER are buyable).
+    """
+    farm = player.farms[player.player]
+    market = player.market
+    actions: list[BuyProductActionState] = []
+    for item in get_args(BUYABLE_PRODUCTS):
+        price = getattr(market.prices, item, 0)
+        available = getattr(market.inventory, item, 0)
+        if price > 0 and available > 0 and farm.money >= price:
+            actions.append(BuyProductActionState(type="BUY_PRODUCT", item=item, count=1))
+    return actions

@@ -1,4 +1,6 @@
 from src.models.farm import AnimalState
+from src.models.action import BuildCoopActionState, BuildPastureActionState
+from src.utils.farm import in_bounds
 
 
 def build_structure(farm, unit_pos, action) -> dict:
@@ -24,3 +26,19 @@ def build_structure(farm, unit_pos, action) -> dict:
     kind = action.type[len("BUILD_"):]  # BUILD_COOP -> COOP, BUILD_PASTURE -> PASTURE
     farm.tiles[row][col] = AnimalState(kind=kind)
     return {"position": [row, col], "kind": kind, "built": True}
+
+
+def get_valid_build_actions_for(farm, unit_pos) -> list:
+    """Valid BUILD_COOP and BUILD_PASTURE actions for a unit at `unit_pos`.
+
+    Both are valid iff the unit is in bounds and the tile is empty (`None`) —
+    any occupant (LOCKED, plant, weed, structure) blocks building. Returns
+    both action variants when buildable.
+    """
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    if farm.tiles[row][col] is not None:
+        return []
+    return [BuildCoopActionState(type="BUILD_COOP"), BuildPastureActionState(type="BUILD_PASTURE")]

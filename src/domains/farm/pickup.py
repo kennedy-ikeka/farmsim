@@ -1,4 +1,4 @@
-from src.utils.farm import ensure_inventory, is_shed_adjacent
+from src.utils.farm import ensure_inventory, is_shed_adjacent, in_bounds
 from src.models.action import PickupActionState
 
 
@@ -41,5 +41,29 @@ def pickup(state, farm, unit_pos, action: PickupActionState, inv_index: int) -> 
     setattr(shed, item, available - to_move)
 
     inventory = ensure_inventory(state, inv_index)
-    inventory[item] = inventory.get(item, 0) + to_move
+    setattr(inventory, item, getattr(inventory, item, 0) + to_move)
     return {"position": [row, col], "item": item, "count": to_move}
+
+
+def get_valid_pickup_actions_for(player, unit_pos, inv_index) -> list[PickupActionState]:
+    """Valid PICKUP actions for a unit at `unit_pos` ([row, col]).
+
+    The unit must be orthogonally adjacent to the shed. Returns one
+    `PickupActionState(item=I, count=1)` per shed field `I` with quantity > 0
+    (seeds live in a separate slot and are never picked up).
+    """
+    farm = player.farms[player.player]
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    rows = len(farm.tiles)
+    cols = len(farm.tiles[0]) if rows else 0
+    if not is_shed_adjacent(row, col, rows, cols):
+        return []
+    shed = player.private.shed
+    return [
+        PickupActionState(type="PICKUP", item=item, count=1)
+        for item in type(shed).model_fields
+        if getattr(shed, item, 0) > 0
+    ]

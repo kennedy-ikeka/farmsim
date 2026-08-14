@@ -1,6 +1,7 @@
 from src.models.crops import CROP_CONFIG
 from src.models.action import HarvestActionState
 from src.models.farm import PlantState
+from src.utils.farm import in_bounds
 
 
 def harvest(state, farm, unit_pos, action: HarvestActionState) -> dict:
@@ -49,3 +50,25 @@ def harvest(state, farm, unit_pos, action: HarvestActionState) -> dict:
     else:
         tile.yield_units = 0  # ongoing: plant stays, reset for next yield
     return {"position": [row, col], "crop": tile.crop, "yield": yield_units}
+
+
+def get_valid_harvest_actions_for(player, unit_pos) -> list[HarvestActionState]:
+    """Valid HARVEST actions for a unit at `unit_pos` ([row, col]).
+
+    HARVEST is valid iff the unit is in bounds, the tile holds a plant that has
+    reached its `first_yield_day`, and the plant has harvestable `yield_units`.
+    """
+    farm = player.farms[player.player]
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    tile = farm.tiles[row][col]
+    if not isinstance(tile, PlantState):
+        return []
+    cfg = CROP_CONFIG[tile.crop]
+    if (player.day - tile.planted_day) < cfg["first_yield_day"]:
+        return []
+    if tile.yield_units <= 0:
+        return []
+    return [HarvestActionState(type="HARVEST")]

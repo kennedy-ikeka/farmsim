@@ -1,4 +1,6 @@
 from src.models.farm import AnimalState
+from src.models.action import FeedActionState
+from src.utils.farm import in_bounds
 
 
 def feed(state, farm, unit_pos, action) -> dict:
@@ -39,3 +41,24 @@ def feed(state, farm, unit_pos, action) -> dict:
     tile.fed_today = True
     tile.consecutive_unfed = 0
     return {"position": [row, col], "animal": tile.animal, "fed": True}
+
+
+def get_valid_feed_actions_for(player, unit_pos) -> list[FeedActionState]:
+    """Valid FEED actions for a unit at `unit_pos` ([row, col]).
+
+    FEED is valid iff the unit is in bounds, the tile is an occupied animal
+    structure that hasn't been fed today, and the player has wheat in the shed.
+    """
+    farm = player.farms[player.player]
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    tile = farm.tiles[row][col]
+    if not isinstance(tile, AnimalState) or tile.animal is None:
+        return []
+    if tile.fed_today:
+        return []
+    if player.private.shed.WHEAT <= 0:
+        return []
+    return [FeedActionState(type="FEED")]

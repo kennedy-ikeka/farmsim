@@ -1,5 +1,6 @@
 from src.models.action import FertilizeActionState
 from src.models.farm import PlantState
+from src.utils.farm import in_bounds
 
 
 def fertilize(state, farm, unit_pos, action: FertilizeActionState) -> dict:
@@ -36,3 +37,22 @@ def fertilize(state, farm, unit_pos, action: FertilizeActionState) -> dict:
     shed.FERTILIZER -= 1
     tile.fertilized_until_day = state.day + 3
     return {"position": [row, col], "fertilized": True}
+
+
+def get_valid_fertilize_actions_for(player, unit_pos) -> list[FertilizeActionState]:
+    """Valid FERTILIZE actions for a unit at `unit_pos` ([row, col]).
+
+    FERTILIZE is valid iff the unit is in bounds, the tile holds a plant, and
+    the player has fertilizer in the shed.
+    """
+    farm = player.farms[player.player]
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    tile = farm.tiles[row][col]
+    if not isinstance(tile, PlantState):
+        return []
+    if player.private.shed.FERTILIZER <= 0:
+        return []
+    return [FertilizeActionState(type="FERTILIZE")]

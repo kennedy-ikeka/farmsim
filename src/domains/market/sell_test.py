@@ -1,7 +1,8 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.market.sell import sell
+from src.domains.market.sell import sell, get_valid_sell_actions
+from src.domains.player.player import Player
 from src.models.action import BuySeedActionState, PassActionState, SellActionState
 from src.models.environment import StepState
 
@@ -171,3 +172,61 @@ class TestSellDispatch:
         assert env.state.privates[0].shed.WHEAT == 3  # 5 - 2 sold
         assert env.state.privates[0].seeds.WHEAT == 3  # 3 seeds bought
         assert farm.money == 20  # 50 - 30
+
+
+class TestGetValidSellActions:
+    """Tests for `get_valid_sell_actions`."""
+
+    # ---------------------------------------------------------------------------
+    # Empty shed — no sellable items.
+    # ---------------------------------------------------------------------------
+
+    def test_empty_shed_returns_empty(self):
+        player = Player().build()
+        assert get_valid_sell_actions(player) == []
+
+    # ---------------------------------------------------------------------------
+    # Item present in shed with a positive price — one SELL action.
+    # ---------------------------------------------------------------------------
+
+    def test_item_in_shed_with_price_returns_action(self):
+        player = Player().build(shed={"WHEAT": 5}, market_prices={"WHEAT": 25})
+        actions = get_valid_sell_actions(player)
+        assert [a.item for a in actions] == ["WHEAT"]
+
+    # ---------------------------------------------------------------------------
+    # Price must be strictly positive — a zero price excludes the item.
+    # ---------------------------------------------------------------------------
+
+    def test_zero_price_excludes_item(self):
+        player = Player().build(shed={"WHEAT": 5}, market_prices={"WHEAT": 0})
+        assert get_valid_sell_actions(player) == []
+
+    # ---------------------------------------------------------------------------
+    # Multiple sellable items — returned in market-price field order.
+    # ---------------------------------------------------------------------------
+
+    def test_multiple_items_returned(self):
+        player = Player().build(shed={"WHEAT": 5, "EGG": 3})
+        actions = get_valid_sell_actions(player)
+        assert [a.item for a in actions] == ["WHEAT", "EGG"]
+
+    # ---------------------------------------------------------------------------
+    # Zero shed quantity excludes the item even if its price is positive.
+    # ---------------------------------------------------------------------------
+
+    def test_zero_shed_excludes_item(self):
+        player = Player().build(shed={"WHEAT": 0})
+        actions = get_valid_sell_actions(player)
+        assert "WHEAT" not in [a.item for a in actions]
+
+    # ---------------------------------------------------------------------------
+    # Each returned action has type="SELL" and count=1.
+    # ---------------------------------------------------------------------------
+
+    def test_each_action_has_type_sell_and_count_one(self):
+        player = Player().build(shed={"WHEAT": 5, "EGG": 3})
+        actions = get_valid_sell_actions(player)
+        for a in actions:
+            assert a.type == "SELL"
+            assert a.count == 1

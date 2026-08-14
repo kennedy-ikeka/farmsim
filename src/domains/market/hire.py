@@ -65,3 +65,16 @@ def hire(state, action: HireActionState) -> dict:
     position = _hand_spawn_position(farm)
     farm.hands.append(position)
     return {"cost": cost, "position": position, "hired": True}
+
+
+def get_valid_hire_actions(player) -> list[HireActionState]:
+    """Valid HIRE action — present iff the farm can afford the next hire.
+
+    HIRE no-ops when `farm.money < FARM_HAND_COST_MULT * _fib(hires_today)`.
+    Returns a single HIRE action (count is implicit — one hand per call).
+    """
+    farm = player.farms[player.player]
+    cost = FARM_HAND_COST_MULT * _fib(farm.hires_today)
+    if farm.money < cost:
+        return []
+    return [HireActionState(type="HIRE")]

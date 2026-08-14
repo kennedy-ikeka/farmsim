@@ -23,3 +23,18 @@ def buy_seed(state, action: BuySeedActionState) -> dict:
     seeds = state.privates[state.player].seeds
     setattr(seeds, action.crop, getattr(seeds, action.crop, 0) + count)
     return {"crop": action.crop, "count": count, "unit_cost": seed_cost, "cost": count * seed_cost}
+
+
+def get_valid_buy_seed_actions(player) -> list[BuySeedActionState]:
+    """Valid BUY_SEED actions — one per crop whose seed cost the farm can afford.
+
+    BUY_SEED no-ops when `farm.money < seed_cost`, so a seed is valid iff the
+    farm can afford at least one. Seeds have unlimited market supply, so
+    inventory is never a constraint. Returns `count=1` (the minimal unit).
+    """
+    farm = player.farms[player.player]
+    return [
+        BuySeedActionState(type="BUY_SEED", crop=crop, count=1)
+        for crop, cfg in CROP_CONFIG.items()
+        if farm.money >= cfg["seed_cost"]
+    ]

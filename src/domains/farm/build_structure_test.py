@@ -1,7 +1,7 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.farm.build_structure import build_structure
+from src.domains.farm.build_structure import build_structure, get_valid_build_actions_for
 from src.models.action import BuildCoopActionState, BuildPastureActionState
 from src.models.environment import StepState
 from src.models.farm import AnimalState, PlantState, WeedState
@@ -105,3 +105,47 @@ class TestBuildStructureDispatch:
         tile = env.state.farms[0].tiles[3][3]
         assert isinstance(tile, AnimalState)
         assert tile.kind == "PASTURE"
+
+
+class TestGetValidBuildActionsFor:
+    """Tests for `get_valid_build_actions_for`."""
+
+    @pytest.mark.parametrize("bad_pos", [None, [5], [], [5, 5, 0]])
+    def test_malformed_position_returns_empty(self, bad_pos):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        assert get_valid_build_actions_for(farm, bad_pos) == []
+
+    def test_out_of_bounds_returns_empty(self):
+        env = _make_env(rows=5, cols=5, farmer=(4, 4))
+        farm = env.state.farms[0]
+        assert get_valid_build_actions_for(farm, [5, 0]) == []
+
+    def test_empty_tile_returns_both_builds(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        actions = get_valid_build_actions_for(farm, [5, 5])
+        assert len(actions) == 2
+        types = sorted(a.type for a in actions)
+        assert types == ["BUILD_COOP", "BUILD_PASTURE"]
+        assert isinstance(actions[0], (BuildCoopActionState, BuildPastureActionState))
+        assert isinstance(actions[1], (BuildCoopActionState, BuildPastureActionState))
+
+    def test_locked_tile_returns_empty(self):
+        tiles = [[None] * 10 for _ in range(10)]
+        tiles[5][5] = "LOCKED"
+        env = _make_env(farmer=(5, 5), tiles=tiles)
+        farm = env.state.farms[0]
+        assert get_valid_build_actions_for(farm, [5, 5]) == []
+
+    def test_plant_tile_returns_empty(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=120)
+        assert get_valid_build_actions_for(farm, [5, 5]) == []
+
+    def test_existing_structure_returns_empty(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = AnimalState(kind="COOP", animal="GOOSE")
+        assert get_valid_build_actions_for(farm, [5, 5]) == []

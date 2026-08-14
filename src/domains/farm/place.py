@@ -1,6 +1,7 @@
 from src.models.action import PlaceActionState
 from src.models.farm import AnimalState
-from src.utils.farm import ensure_inventory, is_shed_adjacent, place_animal
+from src.models.player import InventoryState
+from src.utils.farm import ensure_inventory, is_shed_adjacent, place_animal, in_bounds
 
 
 SHED_CAPACITY = 100
@@ -48,7 +49,7 @@ def place(state, farm, unit_pos, action: PlaceActionState, inv_index: int) -> di
             and isinstance(tile, AnimalState)
             and tile.kind == _ANIMAL_STRUCTURE[item]
             and tile.animal is None
-            and inventory.get(item, 0) > 0):
+            and getattr(inventory, item, 0) > 0):
         place_animal(tile, item, state.day, inventory)
         return {"position": [row, col], "item": item, "count": 1, "mode": "animal"}
 
@@ -60,7 +61,7 @@ def place(state, farm, unit_pos, action: PlaceActionState, inv_index: int) -> di
     if item not in type(shed).model_fields:
         return {"position": [row, col], "item": item, "count": 0, "mode": None}  # not a valid shed item
 
-    have = inventory.get(item, 0)
+    have = getattr(inventory, item, 0)
     if have <= 0:
         return {"position": [row, col], "item": item, "count": 0, "mode": None}
 
@@ -71,5 +72,58 @@ def place(state, farm, unit_pos, action: PlaceActionState, inv_index: int) -> di
         return {"position": [row, col], "item": item, "count": 0, "mode": None}
 
     setattr(shed, item, getattr(shed, item, 0) + to_move)
-    inventory[item] = have - to_move
+    setattr(inventory, item, have - to_move)
     return {"position": [row, col], "item": item, "count": to_move, "mode": "shed"}
+
+
+def get_valid_place_actions_for(player, unit_pos, inv_index) -> list[PlaceActionState]:
+    """Valid PLACE actions for a unit at `unit_pos` ([row, col]).
+
+    PLACE has two modes (tried in order by `place`):
+      1. Animal placement — standing on a matching unoccupied structure with
+         that animal in the unit's inventory.
+      2. Shed drop — standing shed-adjacent, dropping a shed-item from the
+         unit's inventory into the shed (capped by `SHED_CAPACITY`).
+
+    Returns one `PlaceActionState(item=I, count=1)` per item in the unit's
+    inventory for which either mode would fire.
+    """
+    farm = player.farms[player.player]
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    rows = len(farm.tiles)
+    cols = len(farm.tiles[0]) if rows else 0
+
+    # Ensure the unit's inventory slot exists (mirrors `place`'s first step).
+    inventories = player.private.inventories
+    while len(inventories) <= inv_index:
+        inventories.append(InventoryState())
+    inventory = inventories[inv_index]
+
+    tile = farm.tiles[row][col]
+    shed = player.private.shed
+    shed_full = sum(getattr(shed, f) for f in type(shed).model_fields) >= SHED_CAPACITY
+    shed_adjacent = is_shed_adjacent(row, col, rows, cols)
+
+    actions: list[PlaceActionState] = []
+    seen = set()
+    for item in type(inventory).model_fields:
+        have = getattr(inventory, item, 0)
+        if have <= 0 or item in seen:
+            continue
+        seen.add(item)
+        # Mode 1 — animal placement.
+        if (item in _ANIMAL_STRUCTURE
+                and isinstance(tile, AnimalState)
+                and tile.kind == _ANIMAL_STRUCTURE[item]
+                and tile.animal is None):
+            actions.append(PlaceActionState(type="PLACE", item=item, count=1))
+            continue
+        # Mode 2 — shed drop.
+        if (shed_adjacent
+                and item in type(shed).model_fields
+                and not shed_full):
+            actions.append(PlaceActionState(type="PLACE", item=item, count=1))
+    return actions

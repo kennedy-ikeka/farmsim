@@ -1,7 +1,7 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.farm.dig import dig
+from src.domains.farm.dig import dig, get_valid_dig_actions_for
 from src.models.action import DigActionState
 from src.models.environment import StepState
 from src.models.farm import PlantState, WeedState, AnimalState
@@ -179,3 +179,67 @@ class TestDigDispatch:
         tile = env.state.farms[0].tiles[3][3]
         assert isinstance(tile, AnimalState)
         assert tile.animal == "GOOSE"
+
+
+class TestGetValidDigActionsFor:
+    """Tests for `get_valid_dig_actions_for`."""
+
+    @pytest.mark.parametrize("bad_pos", [None, [5]])
+    def test_malformed_position_returns_empty(self, bad_pos):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = WeedState()
+        assert get_valid_dig_actions_for(farm, bad_pos) == []
+
+    def test_out_of_bounds_returns_empty(self):
+        env = _make_env(rows=5, cols=5, farmer=(4, 4))
+        farm = env.state.farms[0]
+        farm.tiles[4][4] = WeedState()
+        assert get_valid_dig_actions_for(farm, [5, 0]) == []
+
+    def test_empty_tile_returns_empty(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        assert get_valid_dig_actions_for(farm, [5, 5]) == []
+
+    def test_locked_tile_returns_empty(self):
+        tiles = [[None] * 10 for _ in range(10)]
+        tiles[5][5] = "LOCKED"
+        env = _make_env(farmer=(5, 5), tiles=tiles)
+        farm = env.state.farms[0]
+        assert get_valid_dig_actions_for(farm, [5, 5]) == []
+
+    def test_plant_tile_returns_one_action(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = PlantState(
+            crop="WHEAT", planted_day=0, max_lifespan_step=120
+        )
+        actions = get_valid_dig_actions_for(farm, [5, 5])
+        assert len(actions) == 1
+        assert isinstance(actions[0], DigActionState)
+        assert actions[0].type == "DIG"
+
+    def test_weed_tile_returns_one_action(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = WeedState()
+        actions = get_valid_dig_actions_for(farm, [5, 5])
+        assert len(actions) == 1
+        assert isinstance(actions[0], DigActionState)
+        assert actions[0].type == "DIG"
+
+    def test_empty_structure_returns_one_action(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = AnimalState(kind="COOP")  # animal defaults to None
+        actions = get_valid_dig_actions_for(farm, [5, 5])
+        assert len(actions) == 1
+        assert isinstance(actions[0], DigActionState)
+        assert actions[0].type == "DIG"
+
+    def test_occupied_structure_returns_empty(self):
+        env = _make_env(farmer=(5, 5))
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = AnimalState(kind="COOP", animal="GOOSE")
+        assert get_valid_dig_actions_for(farm, [5, 5]) == []

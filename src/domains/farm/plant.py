@@ -3,6 +3,7 @@ from src.utils.config import TURNS_PER_DAY
 from src.models.crops import CROP_CONFIG
 from src.models.action import PlantActionState
 from src.models.farm import PlantState
+from src.utils.farm import in_bounds
 
 
 def plant(state, farm, unit_pos, action: PlantActionState) -> dict:
@@ -50,9 +51,23 @@ def plant(state, farm, unit_pos, action: PlantActionState) -> dict:
     return {"crop": action.crop, "position": [row, col], "planted": True}
 
 
-def get_valid_plant_actions(state: RealityState):
-    actions: list[PlantActionState] = []
-    for seed in state.private.seeds:
-        if seed[1] > 0:
-            actions.append(PlantActionState(crop=seed[0]))
-    return actions
+def get_valid_plant_actions_for(player: RealityState, unit_pos) -> list[PlantActionState]:
+    """Valid PLANT actions for a unit at `unit_pos` ([row, col]).
+
+    A PLANT of crop C is valid iff the unit is in bounds, the tile is empty
+    (`None`), and the player has at least one C seed. Returns one
+    `PlantActionState` per crop with seeds > 0.
+    """
+    farm = player.farms[player.player]
+    rc = in_bounds(farm, unit_pos)
+    if rc is None:
+        return []
+    row, col = rc
+    if farm.tiles[row][col] is not None:
+        return []
+    seeds = player.private.seeds
+    return [
+        PlantActionState(type="PLANT", crop=crop)
+        for crop in type(seeds).model_fields
+        if getattr(seeds, crop, 0) > 0
+    ]

@@ -1,7 +1,8 @@
 import pytest
 
 from tests.fixtures import _make_env, _play
-from src.domains.market.buy_seed import buy_seed
+from src.domains.market.buy_seed import buy_seed, get_valid_buy_seed_actions
+from src.domains.player.player import Player
 from src.models.crops import CROP_CONFIG
 from src.models.action import BuySeedActionState, PassActionState
 from src.models.environment import StepState
@@ -135,3 +136,44 @@ class TestBuySeedDispatch:
 
         assert env.state.privates[0].seeds.WHEAT == 0
         assert farm.money == 0.0
+
+
+class TestGetValidBuySeedActions:
+    """Tests for `get_valid_buy_seed_actions`."""
+
+    def test_no_actions_when_broke(self):
+        player = Player().build(money=0)
+        assert get_valid_buy_seed_actions(player) == []
+
+    def test_only_cheapest_when_minimal_money(self):
+        player = Player().build(money=10)
+        actions = get_valid_buy_seed_actions(player)
+        assert len(actions) == 1
+        assert actions[0].crop == "WHEAT"
+
+    def test_all_crops_when_rich(self):
+        player = Player().build(money=100)
+        actions = get_valid_buy_seed_actions(player)
+        assert sorted(a.crop for a in actions) == [
+            "CARROT", "MELON", "STRAWBERRY", "TOMATO", "WHEAT",
+        ]
+
+    def test_partial_set_at_50(self):
+        # 50 >= WHEAT(10), CARROT(20), TOMATO(50) but not STRAWBERRY(100)/MELON(80).
+        player = Player().build(money=50)
+        actions = get_valid_buy_seed_actions(player)
+        assert sorted(a.crop for a in actions) == ["CARROT", "TOMATO", "WHEAT"]
+
+    def test_each_action_has_type_and_count(self):
+        player = Player().build(money=100)
+        actions = get_valid_buy_seed_actions(player)
+        for a in actions:
+            assert a.type == "BUY_SEED"
+            assert a.count == 1
+
+    def test_crop_field_is_valid(self):
+        player = Player().build(money=100)
+        actions = get_valid_buy_seed_actions(player)
+        valid_crops = set(CROP_CONFIG.keys())
+        for a in actions:
+            assert a.crop in valid_crops

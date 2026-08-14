@@ -18,3 +18,20 @@ def sell(state, action: SellActionState) -> dict:
     setattr(state.market.inventory, action.item, inventory + count)
     farm.money += count * price
     return {"item": action.item, "count": count, "price": price, "revenue": count * price}
+
+
+def get_valid_sell_actions(player) -> list[SellActionState]:
+    """Valid SELL actions — one per priced item the shed currently holds.
+
+    SELL (via the interleave loop's `sell_one`) no-ops when `shed.<item> <= 0`
+    or `price <= 0`. Only items with a market price are sellable, so iterate
+    the price fields and check the shed holds at least one. Returns `count=1`.
+    """
+    farm = player.farms[player.player]
+    shed = player.private.shed
+    prices = player.market.prices
+    return [
+        SellActionState(type="SELL", item=item, count=1)
+        for item in type(prices).model_fields
+        if getattr(shed, item, 0) > 0 and getattr(prices, item, 0) > 0
+    ]

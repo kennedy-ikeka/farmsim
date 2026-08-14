@@ -28,6 +28,28 @@ class SeedsState(BaseModel):
     MELON: int = Field(0, description="Number of melon seeds available.")
 
 
+class InventoryState(BaseModel):
+    """Items currently carried by a single unit (farmer or hired hand).
+
+    Mirrors `ShedState`'s 12 fields — every item that can be picked up from
+    the shed or carried by a unit. Fields default to 0 and are always present
+    (no key deletion); an empty inventory is the all-zero state.
+    """
+
+    WHEAT: int = Field(0, description="Quantity of wheat carried.")
+    CARROT: int = Field(0, description="Quantity of carrots carried.")
+    TOMATO: int = Field(0, description="Quantity of tomatoes carried.")
+    STRAWBERRY: int = Field(0, description="Quantity of strawberries carried.")
+    MELON: int = Field(0, description="Quantity of melons carried.")
+    EGG: int = Field(0, description="Quantity of eggs carried.")
+    MILK: int = Field(0, description="Quantity of milk carried.")
+    WOOL: int = Field(0, description="Quantity of wool carried.")
+    FERTILIZER: int = Field(0, description="Quantity of fertilizer carried.")
+    GOOSE: int = Field(0, description="Number of geese carried.")
+    COW: int = Field(0, description="Number of cows carried.")
+    SHEEP: int = Field(0, description="Number of sheep carried.")
+
+
 class PrivateState(BaseModel):
     """Player-specific information that is not part of the public market state."""
 
@@ -41,7 +63,7 @@ class PrivateState(BaseModel):
         description="Seeds currently owned by the player."
     )
 
-    inventories: list[dict] = Field(
+    inventories: list[InventoryState] = Field(
         default=list,
-        description="Additional player inventories and their contents."
+        description="Per-unit inventories (farmer at index 0, then hired hands)."
     )

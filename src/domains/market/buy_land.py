@@ -37,6 +37,25 @@ def buy_land(state, action: BuyLandActionState) -> dict:
     return {"quadrant": next_quad, "cost": cost, "unlocked": True}
 
 
+def get_valid_buy_land_actions(player) -> list[BuyLandActionState]:
+    """Valid BUY_LAND action — present iff a quadrant remains and is affordable.
+
+    BUY_LAND no-ops when all quadrants are unlocked or `farm.money < cost`.
+    Returns a single BUY_LAND action (count is implicit — one quadrant per call).
+    """
+    farm = player.farms[player.player]
+    next_quad = None
+    for q in QUADRANT_ORDER:
+        if q not in farm.unlocked_quadrants:
+            next_quad = q
+            break
+    if next_quad is None:
+        return []
+    if farm.money < QUADRANT_COST[next_quad]:
+        return []
+    return [BuyLandActionState(type="BUY_LAND")]
+
+
 def _unlock_quadrant(farm, quadrant):
     """Convert all LOCKED tiles in the quadrant's range to None."""
     half_r = len(farm.tiles) // 2
