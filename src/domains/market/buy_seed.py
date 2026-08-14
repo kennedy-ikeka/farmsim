@@ -13,7 +13,7 @@ def buy_seed(state, action: BuySeedActionState) -> dict:
     one-unit-at-a-time "order is stopped when out of money" rule.
     """
     farm = state.farms[state.player]
-    seed_cost = CROP_CONFIG[action.crop]["seed_cost"]
+    seed_cost = CROP_CONFIG[action.crop].seed_cost
     affordable = int(farm.money // seed_cost) if seed_cost > 0 else action.count
     count = min(action.count, affordable)
     if count <= 0:
@@ -36,5 +36,5 @@ def get_valid_buy_seed_actions(player) -> list[BuySeedActionState]:
     return [
         BuySeedActionState(type="BUY_SEED", crop=crop, count=1)
         for crop, cfg in CROP_CONFIG.items()
-        if farm.money >= cfg["seed_cost"]
+        if farm.money >= cfg.seed_cost
     ]

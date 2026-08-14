@@ -34,7 +34,7 @@ def harvest(state, farm, unit_pos, action: HarvestActionState) -> dict:
 
     cfg = CROP_CONFIG[tile.crop]
     days_since_planting = state.day - tile.planted_day
-    if days_since_planting < cfg["first_yield_day"]:
+    if days_since_planting < cfg.first_yield_day:
         return {"position": [row, col], "crop": tile.crop, "yield": 0}  # not yet mature
 
     yield_units = tile.yield_units
@@ -45,7 +45,7 @@ def harvest(state, farm, unit_pos, action: HarvestActionState) -> dict:
     current = getattr(shed, tile.crop, 0)
     setattr(shed, tile.crop, current + yield_units)
 
-    if cfg["yield_type"] == "one-time":
+    if cfg.yield_type == "one-time":
         farm.tiles[row][col] = None  # plant consumed
     else:
         tile.yield_units = 0  # ongoing: plant stays, reset for next yield
@@ -67,7 +67,7 @@ def get_valid_harvest_actions_for(player, unit_pos) -> list[HarvestActionState]:
     if not isinstance(tile, PlantState):
         return []
     cfg = CROP_CONFIG[tile.crop]
-    if (player.day - tile.planted_day) < cfg["first_yield_day"]:
+    if (player.day - tile.planted_day) < cfg.first_yield_day:
         return []
     if tile.yield_units <= 0:
         return []

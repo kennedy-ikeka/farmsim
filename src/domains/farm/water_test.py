@@ -242,7 +242,7 @@ class TestWater:
     @pytest.mark.parametrize("crop", ["WHEAT", "CARROT", "MELON"])
     def test_bonus_window_start_matches_crop_config(self, crop):
         cfg = CROP_CONFIG[crop]
-        assert math.ceil(cfg["max_yield_day"] / 2) == {
+        assert math.ceil(cfg.max_yield_day / 2) == {
             "WHEAT": 2, "CARROT": 2, "MELON": 5,
         }[crop]
 

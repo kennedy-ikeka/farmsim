@@ -19,7 +19,7 @@ class TestBuySeedOne:
         farm, priv = _subjects(env)
         farm.money = 100.0
 
-        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+        cost = CROP_CONFIG["WHEAT"].seed_cost
         ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=5))
 
         assert ok is True
@@ -32,7 +32,7 @@ class TestBuySeedOne:
         farm, priv = _subjects(env)
         farm.money = 1000.0
         action = BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=3)
-        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+        cost = CROP_CONFIG["WHEAT"].seed_cost
 
         results = [buy_seed_one(farm, priv, action) for _ in range(3)]
 
@@ -44,7 +44,7 @@ class TestBuySeedOne:
         env = _make_env()
         farm, priv = _subjects(env)
         farm.money = 0.0
-        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+        cost = CROP_CONFIG["WHEAT"].seed_cost
 
         ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1))
 
@@ -56,7 +56,7 @@ class TestBuySeedOne:
     def test_partial_then_noop_when_money_runs_out(self):
         env = _make_env()
         farm, priv = _subjects(env)
-        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+        cost = CROP_CONFIG["WHEAT"].seed_cost
         farm.money = float(cost * 2 + 1)  # afford exactly 2 + a bit
         action = BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=10)
 
@@ -73,7 +73,7 @@ class TestBuySeedOne:
         env = _make_env()
         farm, priv = _subjects(env)
         farm.money = 10_000.0
-        cost = CROP_CONFIG[crop]["seed_cost"]
+        cost = CROP_CONFIG[crop].seed_cost
 
         ok, occ = buy_seed_one(farm, priv, BuySeedActionState(type="BUY_SEED", crop=crop, count=1))
 

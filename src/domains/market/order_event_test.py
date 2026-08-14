@@ -29,7 +29,7 @@ class TestInitOccurred:
         from src.models.crops import CROP_CONFIG
         acc = init_occurred(BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=10))
         assert acc == {"crop": "WHEAT", "count": 0,
-                       "unit_cost": CROP_CONFIG["WHEAT"]["seed_cost"], "cost": 0.0}
+                       "unit_cost": CROP_CONFIG["WHEAT"].seed_cost, "cost": 0.0}
 
     def test_buy_product(self):
         acc = init_occurred(BuyProductActionState(type="BUY_PRODUCT", item="FERTILIZER", count=10))
@@ -39,7 +39,7 @@ class TestInitOccurred:
         from src.models.animals import ANIMAL_CONFIG
         acc = init_occurred(BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=10))
         assert acc == {"animal": "GOOSE", "count": 0,
-                       "unit_cost": ANIMAL_CONFIG["GOOSE"]["cost"], "cost": 0.0}
+                       "unit_cost": ANIMAL_CONFIG["GOOSE"].cost, "cost": 0.0}
 
     def test_hire(self):
         acc = init_occurred(HireActionState(type="HIRE"))
@@ -66,7 +66,7 @@ class TestAccumulate:
 
     def test_buy_seed_sums_count_and_cost(self):
         from src.models.crops import CROP_CONFIG
-        cost = CROP_CONFIG["WHEAT"]["seed_cost"]
+        cost = CROP_CONFIG["WHEAT"].seed_cost
         acc = init_occurred(BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=10))
         accumulate(acc, {"crop": "WHEAT", "count": 1, "unit_cost": cost, "cost": cost})
         accumulate(acc, {"crop": "WHEAT", "count": 1, "unit_cost": cost, "cost": cost})
@@ -82,7 +82,7 @@ class TestAccumulate:
 
     def test_buy_animal_sums_count_and_cost(self):
         from src.models.animals import ANIMAL_CONFIG
-        cost = ANIMAL_CONFIG["GOOSE"]["cost"]
+        cost = ANIMAL_CONFIG["GOOSE"].cost
         acc = init_occurred(BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=10))
         accumulate(acc, {"animal": "GOOSE", "count": 1, "unit_cost": cost, "cost": cost})
         accumulate(acc, {"animal": "GOOSE", "count": 1, "unit_cost": cost, "cost": cost})

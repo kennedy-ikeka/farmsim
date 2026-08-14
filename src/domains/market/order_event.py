@@ -18,12 +18,12 @@ def init_occurred(action) -> dict:
             return {"item": action.item, "count": 0, "price": 0, "revenue": 0.0}
         case "BUY_SEED":
             return {"crop": action.crop, "count": 0,
-                    "unit_cost": CROP_CONFIG[action.crop]["seed_cost"], "cost": 0.0}
+                    "unit_cost": CROP_CONFIG[action.crop].seed_cost, "cost": 0.0}
         case "BUY_PRODUCT":
             return {"item": action.item, "count": 0, "price": 0, "cost": 0.0}
         case "BUY_ANIMAL":
             return {"animal": action.animal, "count": 0,
-                    "unit_cost": ANIMAL_CONFIG[action.animal]["cost"], "cost": 0.0}
+                    "unit_cost": ANIMAL_CONFIG[action.animal].cost, "cost": 0.0}
         case "HIRE":
             return {"cost": 0, "position": None, "hired": False}
         case "BUY_LAND":

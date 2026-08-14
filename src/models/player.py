@@ -1,4 +1,32 @@
+from typing_extensions import Literal
+
 from pydantic import BaseModel, Field
+
+from src.models.resource_weights import ResourceWeights
+
+# How a player chooses actions each turn. Lives here (not in game.py) so
+# `PlayerConfig` can carry a per-player `method` without importing game.py
+# (which imports PrivateState — that would be a circular import).
+PLAY_METHODS = Literal["RANDOM", "BEST_CHOISE", "TACTICAL"]
+
+
+class PlayerConfig(BaseModel):
+    """Per-player configuration: play method + scoring weights.
+
+    Nested inside each player's `PrivateState` (one config per player), so
+    `Environment.step` reads `state.privates[p].config` to drive that
+    player's `play()` dispatch and scoring weights. No separate parallel
+    list on the shared state — the config travels with the private state.
+    """
+
+    method: PLAY_METHODS = Field(
+        'RANDOM',
+        description="How this player chooses actions each turn."
+    )
+    resource_weights: ResourceWeights = Field(
+        default_factory=ResourceWeights,
+        description="Per-resource scoring weights for this player."
+    )
 
 
 class ShedState(BaseModel):
@@ -66,4 +94,13 @@ class PrivateState(BaseModel):
     inventories: list[InventoryState] = Field(
         default=list,
         description="Per-unit inventories (farmer at index 0, then hired hands)."
+    )
+
+    config: PlayerConfig = Field(
+        default_factory=PlayerConfig,
+        description=(
+            "Per-player configuration (play method + scoring weights). "
+            "Nested here so it travels with the private state — no separate "
+            "config list on the shared state."
+        )
     )

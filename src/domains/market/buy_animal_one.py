@@ -10,7 +10,7 @@ def buy_animal_one(farm, priv, action: BuyAnimalActionState) -> tuple[bool, dict
 
     Fails when the farm cannot afford one unit.
     """
-    cost = ANIMAL_CONFIG[action.animal]["cost"]
+    cost = ANIMAL_CONFIG[action.animal].cost
     if farm.money < cost:
         return False, {"animal": action.animal, "count": 0, "unit_cost": cost, "cost": 0}
     farm.money -= cost

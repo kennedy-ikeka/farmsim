@@ -41,7 +41,7 @@ def refresh_animal(tile: AnimalState) -> None:
 
     # Bank care bonus if both fed and cared today (capped by max_held - yield).
     if tile.fed_today and tile.cared_today:
-        max_held = ANIMAL_CONFIG[tile.animal]["max_held"]
+        max_held = ANIMAL_CONFIG[tile.animal].max_held
         if tile.yield_units < max_held:
             tile.pending_care_bonus += 1
 

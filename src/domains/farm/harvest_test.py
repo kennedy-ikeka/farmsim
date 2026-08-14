@@ -232,7 +232,7 @@ class TestHarvest:
         ("STRAWBERRY", 10), ("MELON", 10),
     ])
     def test_first_yield_day_matches_crop_config(self, crop, expected):
-        assert CROP_CONFIG[crop]["first_yield_day"] == expected
+        assert CROP_CONFIG[crop].first_yield_day == expected
 
 
 class TestHarvestDispatch:

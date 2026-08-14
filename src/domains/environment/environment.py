@@ -12,6 +12,8 @@ end-of-day to the `Clock` controller.
 """
 
 import random
+import logging
+from typing import ClassVar
 
 from pydantic import Field
 
@@ -19,16 +21,14 @@ from src.domains.environment.town import Town
 from src.domains.farm.controller import Farm
 from src.domains.market.controller import Market
 from src.models.game import RealityState, SharedRealityState
+from src.models.player import PlayerConfig
 from src.models.market import MarketInventory, MarketPrices
 from src.models.player import PrivateState, SeedsState, ShedState
 from src.domains.player.player import Player
 from src.models.action import PassActionState
-from src.models.environment import EnvironmentState, StepResultState
+from src.models.environment import EnvironmentState, StepResultState, SimulationResultState
 from src.domains.environment.clock import Clock
-
-# Re-exported for tests that import MAX_MARKET_ORDERS_PER_TURN from here.
-# __all__ = ["Environment", "MAX_MARKET_ORDERS_PER_TURN"]
-
+from src.utils.logger import get_logger
 
 SHED_FIELDS = ["WHEAT", "CARROT", "TOMATO", "STRAWBERRY", "MELON", "EGG", "MILK", "WOOL", "FERTILIZER", "GOOSE", "COW", "SHEEP"]
 SEED_FIELDS = ["WHEAT", "CARROT", "TOMATO", "STRAWBERRY", "MELON"]
@@ -52,6 +52,7 @@ class Environment(EnvironmentState):
     # `Environment(...)` defaults to a `Clock` (with behaviour) rather than a
     # behaviourless `ClockState`. Keeps the model layer free of domain imports.
     clock: Clock = Field(default_factory=Clock)
+    logger: ClassVar[logging.Logger] = get_logger("Environment")
 
     def step(self):
         """Apply all players' actions for a single step to `state`, in place.
@@ -67,10 +68,16 @@ class Environment(EnvironmentState):
         Each applied action appends one `EventState` (carrying `intended` and
         `occurred`) to `self.events`. Returns the same (mutated) state.
         """
+        self.logger.info("step start: step=%s day=%s players=%s", self.state.step, self.state.day, len(self.state.privates))
         state = self.state
 
         # 1. Farm actions — each player's farmer + hands, with state.player = p.
-        shared = self.state.model_dump(exclude={'privates', 'player'}, mode='json')
+        #    Each player's `method` and `resource_weights` travel on
+        #    `state.privates[p].config`, so the per-player Player view gets
+        #    them for free via its `private` field — no separate injection.
+        shared = self.state.model_dump(
+            exclude={'privates', 'player'}, mode='json'
+        )
         players = [
             Player(**shared, player=p, private=self.state.privates[p])
             for p in range(len(self.state.privates))
@@ -101,6 +108,7 @@ class Environment(EnvironmentState):
         # 4. Time advance + end-of-day refresh on day rollover.
         self.done = self.clock.advance_time(state, self._rng) or self.done
 
+        self.logger.info("step end: step=%s day=%s done=%s events=%s", state.step, state.day, self.done, len(self.events))
         return state
 
     def step_result(self) -> StepResultState:
@@ -111,7 +119,7 @@ class Environment(EnvironmentState):
             done=self.done,
         )
 
-    def build(self, rows=10, cols=10, money=3000, farmer=(5, 5), hands=None, tiles=None, seeds=None, day=0, step=0, players=2, seed=42):
+    def build(self, rows=10, cols=10, money=3000, farmer=(5, 5), hands=None, tiles=None, seeds=None, day=0, step=0, players=2, player_configs:list[PlayerConfig]=[]):
         shed = ShedState(**{k: 0 for k in SHED_FIELDS})
         seeds = SeedsState(**{k: 0 for k in SEED_FIELDS})
 
@@ -133,8 +141,14 @@ class Environment(EnvironmentState):
         )
 
         farms = [build_farm() for _ in range(players)]
-        privates = [PrivateState(shed=shed, seeds=seeds, inventories=[])
-                        for _ in range(players)]
+        configs = (
+            list(player_configs) if player_configs
+            else [PlayerConfig() for _ in range(players)]
+        )
+        privates = [
+            PrivateState(shed=shed, seeds=seeds, inventories=[], config=configs[p])
+            for p in range(players)
+        ]
 
         self.state = SharedRealityState(
             remainingOverageTime=60,
@@ -146,10 +160,35 @@ class Environment(EnvironmentState):
             market=market,
             town=Town(unlocked_shops=[]),
         )
+        self.logger.info("build: players=%s money=%s farmer=%s rows=%s cols=%s", players, money, farmer, rows, cols)
 
-    def simulate(self, steps: int):
-        """Run `steps` turns, each player playing per-turn, then step the world."""
+    def simulate(self, steps: int, player_configs:list[PlayerConfig]=[]) -> SimulationResultState:
+        """Run `steps` turns, each player playing per-turn, then step the world.
+
+        `player_configs` (optional) overrides the per-player configuration
+        (`method` + `resource_weights`) before running — each `PlayerConfig`
+        is written onto the matching player's `private.config`. Length must
+        match the number of players.
+
+        Returns a `SimulationResultState` with each player's final bank balance
+        and the winning player id (highest balance, `None` on a tie).
+        """
+        if player_configs:
+            for p, cfg in enumerate(player_configs):
+                self.state.privates[p].config = cfg
+
+        self.logger.info("simulate start: steps=%s players=%s", steps, len(self.state.privates))
         for _ in range(steps):
             if self.done:
+                self.logger.info("simulate: episode done, stopping early at step=%s", self.state.step)
                 break
             self.step()
+
+        balances = {p: self.state.farms[p].money for p in range(len(self.state.farms))}
+        winner = None
+        if balances:
+            top = max(balances.values())
+            leaders = [p for p, m in balances.items() if m == top]
+            winner = leaders[0] if len(leaders) == 1 else None
+        self.logger.info("simulate end: balances=%s winner=%s done=%s", balances, winner, self.done)
+        return SimulationResultState(balances=balances, winner=winner, done=self.done)

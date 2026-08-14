@@ -1,38 +1,28 @@
+import logging
 import random
+from typing import ClassVar
 
 from src.utils.config import MAX_MARKET_ORDERS_PER_TURN
-from src.domains.farm.move import get_valid_move_actions_for
-from src.domains.farm.plant import get_valid_plant_actions_for
-from src.domains.farm.water import get_valid_water_actions_for
-from src.domains.farm.harvest import get_valid_harvest_actions_for
-from src.domains.farm.fertilize import get_valid_fertilize_actions_for
-from src.domains.farm.dig import get_valid_dig_actions_for
-from src.domains.farm.build_structure import get_valid_build_actions_for
-from src.domains.farm.feed import get_valid_feed_actions_for
-from src.domains.farm.collect_fertilizer import get_valid_collect_fertilizer_actions_for
-from src.domains.farm.care import get_valid_care_actions_for
-from src.domains.farm.pickup import get_valid_pickup_actions_for
-from src.domains.farm.place import get_valid_place_actions_for
-from src.domains.market.buy_seed import get_valid_buy_seed_actions
-from src.domains.market.buy_product import get_valid_buy_product_actions
-from src.domains.market.buy_animal import get_valid_buy_animal_actions
-from src.domains.market.sell import get_valid_sell_actions
-from src.domains.market.hire import get_valid_hire_actions
-from src.domains.market.buy_land import get_valid_buy_land_actions
 from src.domains.farm import Farm
 from src.domains.market import Market
-from src.models.action import ActionState, PassActionState
+from src.models.action import PassActionState
 from src.models.game import RealityState
-from src.models.environment import StepState, ValidStepsState
-from src.models.player import ShedState, SeedsState, PrivateState
+from src.models.environment import StepState
+from src.models.player import PlayerConfig, ShedState, SeedsState, PrivateState
+from src.models.resource_weights import ResourceWeights
 from src.models.market import MarketInventory, MarketPrices
+from src.domains.player.valid_actions import get_valid_actions
+from src.domains.player.scoring import score_valid_actions
+from src.utils.logger import get_logger
 
 
 class Player(RealityState):
+    logger: ClassVar[logging.Logger] = get_logger("Player")
     def build(self, farmer=(5, 5), hands=None, rows=10, cols=10, seeds=None,
               tiles=None, shed=None, day=0, step=0, inventories=None,
               money=0.0, market_inventory=None, market_prices=None,
-              hires_today=0, unlocked_quadrants=None):
+              hires_today=0, unlocked_quadrants=None,
+              method='RANDOM', resource_weights=None):
         """Build a Player view over a single-player env, pre-populating player 0.
 
         Mirrors `Environment.build` — assembles a one-farm / one-private state
@@ -59,6 +49,10 @@ class Player(RealityState):
         priv = PrivateState(
             shed=shed_state, seeds=seeds_state,
             inventories=list(inventories) if inventories else [],
+            config=PlayerConfig(
+                method=method,
+                resource_weights=resource_weights if resource_weights is not None else ResourceWeights(),
+            ),
         )
 
         inv = MarketInventory(**{f: 0 for f in MarketInventory.model_fields})
@@ -94,64 +88,8 @@ class Player(RealityState):
         self.private = priv
         return self
 
-    def get_valid_pass_actions(self):
-        return [PassActionState()]
-
-    def get_valid_market_actions(self) -> list:
-        """All valid market actions for `player`.
-        
-        Aggregates one of every market per-action helper; each filters to the
-        actions that would mutate state when played (at least one unit would
-        succeed in the interleave loop). Returns `count=1` per viable item — the
-        grading layer decides how many units to actually order.
-        """
-        actions: list = []
-        actions.extend(get_valid_buy_seed_actions(self))
-        actions.extend(get_valid_buy_product_actions(self))
-        actions.extend(get_valid_buy_animal_actions(self))
-        actions.extend(get_valid_sell_actions(self))
-        actions.extend(get_valid_hire_actions(self))
-        actions.extend(get_valid_buy_land_actions(self))
-        return actions
-
-    def get_valid_farm_actions_for(self, unit_pos, inv_index: int) -> list:
-        """All valid farm actions for a single unit (farmer or hired hand) at `unit_pos`.
-
-        `inv_index` is the unit's slot in `player.private.inventories` (farmer = 0,
-        hands = 1..N) — only PICKUP and PLACE use it. Aggregates one of every
-        per-action helper; each helper filters to the actions that would actually
-        mutate state when played.
-        """
-        actions: list = []
-        farm = self.farms[self.player]
-        actions.extend(get_valid_move_actions_for(farm, unit_pos))
-        actions.extend(get_valid_plant_actions_for(self, unit_pos))
-        actions.extend(get_valid_water_actions_for(farm, unit_pos))
-        actions.extend(get_valid_harvest_actions_for(self, unit_pos))
-        actions.extend(get_valid_fertilize_actions_for(self, unit_pos))
-        actions.extend(get_valid_dig_actions_for(farm, unit_pos))
-        actions.extend(get_valid_build_actions_for(farm, unit_pos))
-        actions.extend(get_valid_feed_actions_for(self, unit_pos))
-        actions.extend(get_valid_collect_fertilizer_actions_for(farm, unit_pos))
-        actions.extend(get_valid_care_actions_for(farm, unit_pos))
-        actions.extend(get_valid_pickup_actions_for(self, unit_pos, inv_index))
-        actions.extend(get_valid_place_actions_for(self, unit_pos, inv_index))
-        return actions
-
-    def get_valid_actions(self) -> ValidStepsState:
-        farm = self.farms[self.player]
-        farmer = list(self.get_valid_pass_actions())
-        farmer.extend(self.get_valid_farm_actions_for(farm.farmer, 0))
-
-        hands: list[list[ActionState]] = []
-        for h, hand_pos in enumerate(farm.hands):
-            hands.append(self.get_valid_farm_actions_for(hand_pos, h + 1))
-
-        market = self.get_valid_market_actions()
-        return ValidStepsState(farmer=farmer, hands=hands, market=market)
-
     def random_play(self) -> StepState:
-        actions = self.get_valid_actions()
+        actions = get_valid_actions(self)
         farmer = random.choice(actions.farmer) if actions.farmer else PassActionState()
         hands = [
             random.choice(acts) if acts else PassActionState()
@@ -159,20 +97,47 @@ class Player(RealityState):
         ]
         market = random.choices(actions.market, k=MAX_MARKET_ORDERS_PER_TURN) if actions.market else []
         step = StepState(farmer=farmer, hands=hands, market=market)
+        self.logger.info("random_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
         return step
 
-    def play(self) -> StepState:
-        if self.method == 'RANDOM':
-            return self.random_play()
-        
+    def best_play(self) -> StepState:
+        """Select the highest-scoring valid action for each slot, by score alone.
+
+        Farmer and each hand take their single highest-scored action; market
+        takes the top `MAX_MARKET_ORDERS_PER_TURN` highest-scored market
+        actions (no repeats — distinct actions only). Empty slots fall back
+        to PASS.
+        """
+        scored = score_valid_actions(get_valid_actions(self), self)
+        farmer = (
+            max(scored.farmer, key=lambda s: s.score).action
+            if scored.farmer else PassActionState()
+        )
+        hands = [
+            max(hand, key=lambda s: s.score).action if hand else PassActionState()
+            for hand in scored.hands
+        ]
+        top_market = sorted(scored.market, key=lambda s: s.score, reverse=True)[:MAX_MARKET_ORDERS_PER_TURN]
+        market = [s.action for s in top_market]
+        step = StepState(farmer=farmer, hands=hands, market=market)
+        self.logger.info("best_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
+        return step
+
+    def tactical_play(self):
+        self.logger.info("tactical_play: player=%s (no-op)", self.player)
         return StepState()
 
+    def play(self) -> StepState:
+        method = self.private.config.method
+        self.logger.info("play: player=%s method=%s", self.player, method)
+        if method == 'RANDOM':
+            return self.random_play()
 
-def get_valid_farm_actions_for(player: RealityState, unit_pos, inv_index: int) -> list:
-    """Module-level alias for `Player.get_valid_farm_actions_for`."""
-    return Player.get_valid_farm_actions_for(player, unit_pos, inv_index)
+        if method == 'BEST_CHOISE':
+            return self.best_play()
 
+        if method == 'TACTICAL':
+            return self.tactical_play()
 
-def get_valid_market_actions(player) -> list:
-    """Module-level alias for `Player.get_valid_market_actions`."""
-    return Player.get_valid_market_actions(player)
+        self.logger.warning("play: unknown method=%s, falling back to PASS", method)
+        return StepState()

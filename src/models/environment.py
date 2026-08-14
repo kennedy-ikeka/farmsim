@@ -1,5 +1,6 @@
 from enum import Enum
 import random
+from typing import Optional
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -50,6 +51,19 @@ class StepResultState(BaseModel):
     state: GameState = Field(description="The analyzed state of the game")
     reward: dict[int, float] = Field(default_factory=dict, description="The reward from the step")
     done: bool = Field(default=False, description="Has the step completed")
+
+
+class SimulationResultState(BaseModel):
+    """Outcome of an `Environment.simulate` run — final balances + winner."""
+    balances: dict[int, float] = Field(
+        default_factory=dict,
+        description="Final bank balance per player id."
+    )
+    winner: Optional[int] = Field(
+        default=None,
+        description="Player id with the highest balance, or None on a tie."
+    )
+    done: bool = Field(default=False, description="Whether the episode finished.")
 
 
 class EnvironmentState(BaseModel):

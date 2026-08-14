@@ -1,5 +1,6 @@
-from src.domains.player.player import (
-    Player,
+from src.domains.player.player import Player
+from src.domains.player.valid_actions import (
+    get_valid_actions,
     get_valid_farm_actions_for,
     get_valid_market_actions,
 )
@@ -52,53 +53,53 @@ class TestGetValidActions:
 
     def test_includes_pass(self):
         player = Player().build(farmer=(5, 5))
-        assert "PASS" in _types(_all_actions(player.get_valid_actions()))
+        assert "PASS" in _types(_all_actions(get_valid_actions(player)))
 
     def test_move_set_center_farmer_no_hands(self):
         """The four in-bounds farmer moves are present (other action types may
         also appear when the tile is empty, so filter to moves here)."""
         player = Player().build(farmer=(5, 5), hands=[])
-        assert _move_types(_all_actions(player.get_valid_actions())) == ["EAST", "NORTH", "SOUTH", "WEST"]
+        assert _move_types(_all_actions(get_valid_actions(player))) == ["EAST", "NORTH", "SOUTH", "WEST"]
 
     def test_move_set_corner_farmer(self):
         player = Player().build(farmer=(0, 0), hands=[])
-        assert _move_types(_all_actions(player.get_valid_actions())) == ["EAST", "SOUTH"]
+        assert _move_types(_all_actions(get_valid_actions(player))) == ["EAST", "SOUTH"]
 
     def test_move_union_across_hands(self):
         """One hand at NW corner, one at SE — the move union is still all four."""
         player = Player().build(farmer=(5, 5), hands=[[0, 0], [9, 9]])
-        assert set(_move_types(_all_actions(player.get_valid_actions()))) == {"EAST", "NORTH", "SOUTH", "WEST"}
+        assert set(_move_types(_all_actions(get_valid_actions(player)))) == {"EAST", "NORTH", "SOUTH", "WEST"}
 
     def test_move_count_reflects_every_unit(self):
         """4 (farmer) + 2 (hand 0) + 2 (hand 1) = 8 move actions, plus 1 pass."""
         player = Player().build(farmer=(5, 5), hands=[[0, 0], [9, 9]])
-        actions = _all_actions(player.get_valid_actions())
+        actions = _all_actions(get_valid_actions(player))
         assert sum(1 for a in actions if isinstance(a, MoveActionState)) == 8
         assert sum(1 for a in actions if isinstance(a, PassActionState)) == 1
 
     def test_move_union_edge_farmer_with_edge_hand(self):
         player = Player().build(farmer=(0, 5), hands=[[9, 0]])
-        types = _move_types(_all_actions(player.get_valid_actions()))
+        types = _move_types(_all_actions(get_valid_actions(player)))
         assert set(types) == {"EAST", "NORTH", "SOUTH", "WEST"}
 
     def test_includes_build_on_empty_tile(self):
         """A farmer on an empty tile gets BUILD_COOP and BUILD_PASTURE."""
         player = Player().build(farmer=(5, 5), hands=[])
-        types = _types(_all_actions(player.get_valid_actions()))
+        types = _types(_all_actions(get_valid_actions(player)))
         assert "BUILD_COOP" in types
         assert "BUILD_PASTURE" in types
 
     def test_includes_plant_with_seeds_on_empty_tile(self):
         """A farmer on an empty tile with WHEAT seeds gets a PLANT action."""
         player = Player().build(farmer=(5, 5), seeds={"WHEAT": 2})
-        plants = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, PlantActionState)]
+        plants = [a for a in _all_actions(get_valid_actions(player)) if isinstance(a, PlantActionState)]
         assert len(plants) == 1
         assert plants[0].crop == "WHEAT"
 
     def test_includes_water_on_unwatered_plant(self):
         plant = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=100)
         player = Player().build(farmer=(0, 0), tiles=[[plant]])
-        waters = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, WaterActionState)]
+        waters = [a for a in _all_actions(get_valid_actions(player)) if isinstance(a, WaterActionState)]
         assert len(waters) == 1
 
     def test_includes_harvest_on_mature_plant(self):
@@ -106,57 +107,57 @@ class TestGetValidActions:
         plant = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=100,
                            yield_units=3)
         player = Player().build(farmer=(0, 0), tiles=[[plant]], day=2)
-        harvests = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, HarvestActionState)]
+        harvests = [a for a in _all_actions(get_valid_actions(player)) if isinstance(a, HarvestActionState)]
         assert len(harvests) == 1
 
     def test_includes_dig_on_weed(self):
         player = Player().build(farmer=(0, 0), tiles=[[WeedState()]])
-        assert any(isinstance(a, DigActionState) for a in _all_actions(player.get_valid_actions()))
+        assert any(isinstance(a, DigActionState) for a in _all_actions(get_valid_actions(player)))
 
     def test_includes_fertilize_on_plant_with_fertilizer(self):
         plant = PlantState(crop="WHEAT", planted_day=0, max_lifespan_step=100)
         player = Player().build(farmer=(0, 0), tiles=[[plant]], shed={"FERTILIZER": 1})
-        assert any(isinstance(a, FertilizeActionState) for a in _all_actions(player.get_valid_actions()))
+        assert any(isinstance(a, FertilizeActionState) for a in _all_actions(get_valid_actions(player)))
 
     def test_includes_pickup_when_shed_adjacent_with_stock(self):
         # (4,4) is one of the four shed-adjacent tiles on a 10x10 grid.
         player = Player().build(farmer=(4, 4), shed={"WHEAT": 1})
-        pickups = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, PickupActionState)]
+        pickups = [a for a in _all_actions(get_valid_actions(player)) if isinstance(a, PickupActionState)]
         assert len(pickups) == 1
         assert pickups[0].item == "WHEAT"
 
     def test_no_pickup_when_not_shed_adjacent(self):
         player = Player().build(farmer=(0, 0), shed={"WHEAT": 1})
-        assert not any(isinstance(a, PickupActionState) for a in _all_actions(player.get_valid_actions()))
+        assert not any(isinstance(a, PickupActionState) for a in _all_actions(get_valid_actions(player)))
 
     def test_includes_feed_on_hungry_animal_with_wheat(self):
         coop = AnimalState(kind="COOP", animal="GOOSE")
         player = Player().build(farmer=(0, 0), tiles=[[coop]], shed={"WHEAT": 1})
-        assert any(isinstance(a, FeedActionState) for a in _all_actions(player.get_valid_actions()))
+        assert any(isinstance(a, FeedActionState) for a in _all_actions(get_valid_actions(player)))
 
     def test_includes_collect_fertilizer_when_available(self):
         coop = AnimalState(kind="COOP", animal="GOOSE", fertilizer_available=1)
         player = Player().build(farmer=(0, 0), tiles=[[coop]])
         assert any(isinstance(a, CollectFertilizerActionState)
-                   for a in _all_actions(player.get_valid_actions()))
+                   for a in _all_actions(get_valid_actions(player)))
 
     def test_includes_care_on_uncared_animal(self):
         coop = AnimalState(kind="COOP", animal="GOOSE")
         player = Player().build(farmer=(0, 0), tiles=[[coop]])
-        assert any(isinstance(a, CareActionState) for a in _all_actions(player.get_valid_actions()))
+        assert any(isinstance(a, CareActionState) for a in _all_actions(get_valid_actions(player)))
 
     def test_includes_place_animal_on_matching_empty_structure(self):
         coop = AnimalState(kind="COOP", animal=None)
         player = Player().build(farmer=(0, 0), tiles=[[coop]],
                               inventories=[InventoryState(GOOSE=1)])
-        places = [a for a in _all_actions(player.get_valid_actions()) if isinstance(a, PlaceActionState)]
+        places = [a for a in _all_actions(get_valid_actions(player)) if isinstance(a, PlaceActionState)]
         assert any(p.item == "GOOSE" for p in places)
 
     def test_hand_actions_aggregated(self):
         """A hand on an empty tile also gets BUILD actions (inv_index 1)."""
         player = Player().build(farmer=(5, 5), hands=[[4, 4]])
         # Farmer + hand each on empty tiles -> 2 BUILD_COOP + 2 BUILD_PASTURE.
-        builds = [a for a in _all_actions(player.get_valid_actions())
+        builds = [a for a in _all_actions(get_valid_actions(player))
                   if isinstance(a, (BuildCoopActionState, BuildPastureActionState))]
         assert len(builds) == 4
 
@@ -199,13 +200,13 @@ class TestGetValidMarketActions:
     def test_empty_when_no_money_and_no_stock(self):
         """Default state (money=0, empty shed, empty market) yields no market actions."""
         player = Player().build()
-        assert player.get_valid_market_actions() == []
+        assert get_valid_market_actions(player) == []
         assert get_valid_market_actions(player) == []
 
     def test_buy_seed_when_affordable(self):
         """With money >= cheapest seed (WHEAT=10), BUY_SEED appears."""
         player = Player().build(money=10)
-        seeds = [a for a in player.get_valid_market_actions()
+        seeds = [a for a in get_valid_market_actions(player)
                  if isinstance(a, BuySeedActionState)]
         assert len(seeds) == 1
         assert seeds[0].crop == "WHEAT"
@@ -213,7 +214,7 @@ class TestGetValidMarketActions:
     def test_buy_seed_all_crops_when_rich(self):
         """money=3000 affords every seed (max cost 100)."""
         player = Player().build(money=3000)
-        crops = sorted(a.crop for a in player.get_valid_market_actions()
+        crops = sorted(a.crop for a in get_valid_market_actions(player)
                        if isinstance(a, BuySeedActionState))
         assert crops == ["CARROT", "MELON", "STRAWBERRY", "TOMATO", "WHEAT"]
 
@@ -221,7 +222,7 @@ class TestGetValidMarketActions:
         player = Player().build(money=3000,
                               market_inventory={"WHEAT": 100, "FERTILIZER": 50},
                               market_prices={"WHEAT": 25, "FERTILIZER": 100})
-        items = sorted(a.item for a in player.get_valid_market_actions()
+        items = sorted(a.item for a in get_valid_market_actions(player)
                        if isinstance(a, BuyProductActionState))
         assert items == ["FERTILIZER", "WHEAT"]
 
@@ -230,14 +231,14 @@ class TestGetValidMarketActions:
         player = Player().build(money=50,
                               market_inventory={"WHEAT": 100, "FERTILIZER": 50},
                               market_prices={"WHEAT": 25, "FERTILIZER": 100})
-        items = [a.item for a in player.get_valid_market_actions()
+        items = [a.item for a in get_valid_market_actions(player)
                  if isinstance(a, BuyProductActionState)]
         assert items == ["WHEAT"]
 
     def test_buy_animal_when_affordable(self):
         """GOOSE=300, COW=400, SHEEP=500. money=300 → only GOOSE."""
         player = Player().build(money=300)
-        animals = sorted(a.animal for a in player.get_valid_market_actions()
+        animals = sorted(a.animal for a in get_valid_market_actions(player)
                          if isinstance(a, BuyAnimalActionState))
         assert animals == ["GOOSE"]
 
@@ -245,7 +246,7 @@ class TestGetValidMarketActions:
         """shed.WHEAT=5 + price.WHEAT=25 → a SELL action; price=0 → none."""
         player = Player().build(money=3000, shed={"WHEAT": 5},
                               market_prices={"WHEAT": 25})
-        sells = [a for a in player.get_valid_market_actions()
+        sells = [a for a in get_valid_market_actions(player)
                  if isinstance(a, SellActionState)]
         assert len(sells) == 1
         assert sells[0].item == "WHEAT"
@@ -254,31 +255,31 @@ class TestGetValidMarketActions:
         player = Player().build(money=3000, shed={"WHEAT": 5},
                               market_prices={"WHEAT": 0})
         assert not any(isinstance(a, SellActionState)
-                       for a in player.get_valid_market_actions())
+                       for a in get_valid_market_actions(player))
 
     def test_hire_when_affordable(self):
         """hires_today=0 → cost=1; money=1 affords it."""
         player = Player().build(money=1, hires_today=0)
         assert any(isinstance(a, HireActionState)
-                   for a in player.get_valid_market_actions())
+                   for a in get_valid_market_actions(player))
 
     def test_hire_no_op_when_broke(self):
         """hires_today=2 → cost=2; money=1 can't afford."""
         player = Player().build(money=1, hires_today=2)
         assert not any(isinstance(a, HireActionState)
-                       for a in player.get_valid_market_actions())
+                       for a in get_valid_market_actions(player))
 
     def test_buy_land_when_affordable(self):
         """NW unlocked (default), NE next at 1000; money=1000 affords it."""
         player = Player().build(money=1000, unlocked_quadrants=["NW"])
         assert any(isinstance(a, BuyLandActionState)
-                   for a in player.get_valid_market_actions())
+                   for a in get_valid_market_actions(player))
 
     def test_buy_land_no_op_when_all_unlocked(self):
         player = Player().build(money=10000,
                               unlocked_quadrants=["NW", "NE", "SW", "SE"])
         assert not any(isinstance(a, BuyLandActionState)
-                       for a in player.get_valid_market_actions())
+                       for a in get_valid_market_actions(player))
 
     def test_aggregates_all_six_types(self):
         """A rich player with stock and shed items gets all six action types."""
@@ -290,5 +291,5 @@ class TestGetValidMarketActions:
             hires_today=0,
             unlocked_quadrants=["NW"],
         )
-        types = set(a.type for a in player.get_valid_market_actions())
+        types = set(a.type for a in get_valid_market_actions(player))
         assert {"BUY_SEED", "BUY_PRODUCT", "BUY_ANIMAL", "SELL", "HIRE", "BUY_LAND"} <= types

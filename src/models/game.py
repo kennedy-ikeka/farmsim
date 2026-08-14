@@ -6,13 +6,13 @@ from pydantic import BaseModel, Field
 from src.models.action import ActionState
 from src.models.farm import FarmState
 from src.models.market import MarketState
-from src.models.player import PrivateState
+from src.models.player import PLAY_METHODS, PrivateState
 from src.models.town import TownState
 
 PLAN_STATUS = Literal["PENDING", 'ACTIVE', 'COMPLETED', 'BLOCKED', 'ABANDONED']
 TARGET_METRICS = Literal["MONEY"]
 TARGET_OPERATIONS = Literal["EQ", "GTE", "LTE", "GT", "LT"]
-PLAY_METHODS = Literal["RANDOM", "BEST_CHOISE"]
+
 
 class GameState(BaseModel):
     """Full two-player game state — the authoritative world the controllers mutate.
@@ -74,16 +74,15 @@ class GameState(BaseModel):
 
 class RealityState(GameState):
     private: PrivateState = Field(
-        default_factory=PrivateState, 
+        default_factory=PrivateState,
         description='Current players private state'
     )
-    method: PLAY_METHODS = Field('RANDOM', description="The players method")
 
 
 class SharedRealityState(GameState):
     privates: list[PrivateState] = Field(
-            default_factory=list,
-            description="Per-player private state, indexed by player id."
+        default_factory=list,
+        description="Per-player private state, indexed by player id."
     )
 
 
@@ -135,6 +134,7 @@ class ProposalState(BaseModel):
         ge=1,
         description="Proposal priority; lower values indicate higher priority"
     )
+
 class ExecutionState(BaseModel):
     """Placeholder record of a single attempt to execute a `Plan`.
 

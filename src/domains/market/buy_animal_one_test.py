@@ -18,7 +18,7 @@ class TestBuyAnimalOne:
     def test_buys_single_animal_at_fixed_cost(self, animal):
         env = _make_env()
         farm, priv = _subjects(env)
-        cost = ANIMAL_CONFIG[animal]["cost"]
+        cost = ANIMAL_CONFIG[animal].cost
         farm.money = float(cost) + 100.0
 
         ok, occ = buy_animal_one(farm, priv, BuyAnimalActionState(type="BUY_ANIMAL", animal=animal, count=3))
@@ -31,7 +31,7 @@ class TestBuyAnimalOne:
     def test_accumulates_across_calls(self):
         env = _make_env()
         farm, priv = _subjects(env)
-        cost = ANIMAL_CONFIG["GOOSE"]["cost"]
+        cost = ANIMAL_CONFIG["GOOSE"].cost
         farm.money = float(cost) * 3 + 50.0
         action = BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=3)
 
@@ -44,7 +44,7 @@ class TestBuyAnimalOne:
     def test_noop_when_cannot_afford(self):
         env = _make_env()
         farm, priv = _subjects(env)
-        cost = ANIMAL_CONFIG["GOOSE"]["cost"]
+        cost = ANIMAL_CONFIG["GOOSE"].cost
         farm.money = 0.0
 
         ok, occ = buy_animal_one(farm, priv, BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=1))
@@ -57,7 +57,7 @@ class TestBuyAnimalOne:
     def test_partial_then_noop_when_money_runs_out(self):
         env = _make_env()
         farm, priv = _subjects(env)
-        cost = ANIMAL_CONFIG["GOOSE"]["cost"]
+        cost = ANIMAL_CONFIG["GOOSE"].cost
         farm.money = float(cost) * 2  # afford exactly 2
         action = BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=10)
 

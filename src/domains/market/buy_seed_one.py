@@ -10,7 +10,7 @@ def buy_seed_one(farm, priv, action: BuySeedActionState) -> tuple[bool, dict]:
 
     Fails when the farm cannot afford one unit.
     """
-    cost = CROP_CONFIG[action.crop]["seed_cost"]
+    cost = CROP_CONFIG[action.crop].seed_cost
     if farm.money < cost:
         return False, {"crop": action.crop, "count": 0, "unit_cost": cost, "cost": 0}
     farm.money -= cost

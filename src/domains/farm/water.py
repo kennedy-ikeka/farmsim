@@ -42,14 +42,14 @@ def water(state, farm, unit_pos) -> dict:
     tile.consecutive_unwatered = 0
 
     cfg = CROP_CONFIG[tile.crop]
-    if cfg["yield_type"] != "one-time":
+    if cfg.yield_type != "one-time":
         return {"position": [row, col], "watered": True, "bonus": 0}  # ongoing: bonus at production time
 
     # Bonus window is measured in days since planting: the window starts at
     # ceil(max_yield_day / 2) and runs through max_yield_day (inclusive).
     days_since_planting = state.day - tile.planted_day
-    window_start = math.ceil(cfg["max_yield_day"] / 2)
-    window_end = cfg["max_yield_day"]
+    window_start = math.ceil(cfg.max_yield_day / 2)
+    window_end = cfg.max_yield_day
     if not (window_start <= days_since_planting <= window_end):
         return {"position": [row, col], "watered": True, "bonus": 0}
 

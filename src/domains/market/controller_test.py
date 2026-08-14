@@ -79,7 +79,7 @@ class TestMarketApply:
         farm.money = 1000.0
         env.state.market.apply(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=2))
         assert env.state.privates[0].shed.GOOSE == 2
-        assert farm.money == 1000.0 - 2 * ANIMAL_CONFIG["GOOSE"]["cost"]
+        assert farm.money == 1000.0 - 2 * ANIMAL_CONFIG["GOOSE"].cost
 
     # ---------------------------------------------------------------------------
     # HIRE dispatches to hire.

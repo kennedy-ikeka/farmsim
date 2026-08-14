@@ -41,7 +41,7 @@ def plant(state, farm, unit_pos, action: PlantActionState) -> dict:
     cfg = CROP_CONFIG[action.crop]
     # Decay begins one day after max_yield_day for both one-time and ongoing
     # crops; convert that day to a step (turn) offset from the current step.
-    max_lifespan_step = state.step + (cfg["max_yield_day"] + 1) * TURNS_PER_DAY
+    max_lifespan_step = state.step + (cfg.max_yield_day + 1) * TURNS_PER_DAY
 
     farm.tiles[row][col] = PlantState(
         crop=action.crop,

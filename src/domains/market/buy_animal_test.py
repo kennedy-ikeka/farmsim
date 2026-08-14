@@ -16,7 +16,7 @@ class TestBuyAnimal:
         env = _make_env()
         farm = env.state.farms[0]
         farm.money = 5000.0
-        cost = ANIMAL_CONFIG[animal]["cost"]
+        cost = ANIMAL_CONFIG[animal].cost
 
         buy_animal(env.state, BuyAnimalActionState(type="BUY_ANIMAL", animal=animal, count=2))
 
@@ -107,7 +107,7 @@ class TestBuyAnimalDispatch:
         _play(env, step)
 
         assert env.state.privates[0].shed.GOOSE == 2
-        assert farm.money == 1000.0 - 2 * ANIMAL_CONFIG["GOOSE"]["cost"]
+        assert farm.money == 1000.0 - 2 * ANIMAL_CONFIG["GOOSE"].cost
 
 
 

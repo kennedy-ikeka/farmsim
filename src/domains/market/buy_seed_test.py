@@ -16,7 +16,7 @@ class TestBuySeed:
         env = _make_env()
         farm = env.state.farms[0]
         farm.money = 1000.0
-        cost = CROP_CONFIG[crop]["seed_cost"]
+        cost = CROP_CONFIG[crop].seed_cost
 
         buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop=crop, count=3))
 
@@ -32,7 +32,7 @@ class TestBuySeed:
         buy_seed(env.state, BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=3))
 
         assert env.state.privates[0].seeds.WHEAT == 5
-        assert farm.money == 1000.0 - 3 * CROP_CONFIG["WHEAT"]["seed_cost"]
+        assert farm.money == 1000.0 - 3 * CROP_CONFIG["WHEAT"].seed_cost
 
     def test_does_not_touch_other_crops_seeds(self):
         env = _make_env()
@@ -120,7 +120,7 @@ class TestBuySeedDispatch:
         _play(env, step)
 
         assert env.state.privates[0].seeds.WHEAT == 4
-        assert farm.money == 500.0 - 4 * CROP_CONFIG["WHEAT"]["seed_cost"]
+        assert farm.money == 500.0 - 4 * CROP_CONFIG["WHEAT"].seed_cost
 
     def test_noop_when_broke_does_not_add_seeds(self):
         env = _make_env()

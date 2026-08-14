@@ -13,7 +13,7 @@ def buy_animal(state, action: BuyAnimalActionState) -> dict:
     one-unit-at-a-time "order is stopped when out of money" rule.
     """
     farm = state.farms[state.player]
-    cost = ANIMAL_CONFIG[action.animal]["cost"]
+    cost = ANIMAL_CONFIG[action.animal].cost
     affordable = int(farm.money // cost) if cost > 0 else action.count
     count = min(action.count, affordable)
     if count <= 0:
@@ -35,5 +35,5 @@ def get_valid_buy_animal_actions(player) -> list[BuyAnimalActionState]:
     return [
         BuyAnimalActionState(type="BUY_ANIMAL", animal=animal, count=1)
         for animal, cfg in ANIMAL_CONFIG.items()
-        if farm.money >= cfg["cost"]
+        if farm.money >= cfg.cost
     ]
