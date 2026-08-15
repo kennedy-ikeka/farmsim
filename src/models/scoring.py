@@ -11,7 +11,7 @@ class ScoredActionState(BaseModel):
     score: float = Field(0.0, description="Final score = reward - (cost + risk) / 2.")
     cost_score: float = Field(0.0, description="Resources consumed by this action.")
     reward_score: float = Field(0.0, description="Resources gained by this action.")
-    risk_score: float = Field(0.0, description="Probability-weighted risk of action not bearing fruit.")
+    future_cost_score: float = Field(0.0, description="Probability-weighted risk of action not bearing fruit.")
 
 
 class ScoredValidStepsState(BaseModel):

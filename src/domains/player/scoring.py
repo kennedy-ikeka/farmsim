@@ -73,18 +73,24 @@ def action_resource_usage(action: ActionState, player: RealityState) -> dict[str
     """How much of each resource this action consumes."""
     usage = {"STEP": 1.0}
     farm = player.farms[player.player]
+    prices = player.market.prices
     t = action.type
 
     if t == "PLANT":
-        usage["SEED"] = 1.0
+        usage["SEED"] = float(CROP_CONFIG[action.crop].seed_cost)
+        usage["LAND"] = 1.0
     elif t == "BUILD_COOP":
         usage["LAND"] = 1.0
     elif t == "BUILD_PASTURE":
         usage["LAND"] = 1.0
+    elif t == "FEED":
+        usage["MONEY"] = float(getattr(prices, "WHEAT", 0))
+    elif t == "FERTILIZE":
+        usage["MONEY"] = float(getattr(prices, "FERTILIZER", 0))
     elif t == "BUY_SEED":
         usage["MONEY"] = float(action.count * CROP_CONFIG[action.crop].seed_cost)
     elif t == "BUY_PRODUCT":
-        usage["MONEY"] = float(action.count * getattr(player.market.prices, action.item))
+        usage["MONEY"] = float(action.count * getattr(prices, action.item))
     elif t == "BUY_ANIMAL":
         usage["MONEY"] = float(action.count * ANIMAL_CONFIG[action.animal].cost)
     elif t == "HIRE":
@@ -98,16 +104,6 @@ def action_resource_usage(action: ActionState, player: RealityState) -> dict[str
         usage["MONEY"] = float(QUADRANT_COST[next_quad]) if next_quad else 0.0
 
     return usage
-
-
-def cost_score(action: ActionState, player: RealityState) -> float:
-    usage = action_resource_usage(action, player)
-    avail = available_resources(player)
-    weights = player.private.config.resource_weights
-    return sum(
-        (usage[r] / max(avail[r], 1.0)) * getattr(weights, r)
-        for r in usage if usage[r] > 0
-    )
 
 
 def action_resource_gain(action: ActionState, player: RealityState) -> dict[str, float]:
@@ -135,6 +131,8 @@ def action_resource_gain(action: ActionState, player: RealityState) -> dict[str,
         gain["SEED"] = float(action.count * CROP_CONFIG[action.crop].seed_cost)
     elif t == "BUY_ANIMAL":
         gain["ANIMAL"] = float(action.count * ANIMAL_CONFIG[action.animal].cost)
+    elif t == "BUY_PRODUCT":
+        gain["MONEY"] = float(action.count * getattr(prices, action.item, 0))
     elif t == "HIRE":
         gain["HAND"] = 1.0
     elif t == "BUY_LAND":
@@ -155,10 +153,48 @@ def action_resource_gain(action: ActionState, player: RealityState) -> dict[str,
             }
             r0, r1, c0, c1 = ranges[next_quad]
             gain["LAND"] = float((r1 - r0) * (c1 - c0))
+    elif t == "PLANT":
+        gain["MONEY"] = float(
+            CROP_CONFIG[action.crop].max_yield * getattr(prices, action.crop, 0)
+        )
+    elif t in ("BUILD_COOP", "BUILD_PASTURE"):
+        if t == "BUILD_COOP":
+            product = "EGG"
+        else:
+            product = "MILK" if prices.MILK >= prices.WOOL else "WOOL"
+        gain["MONEY"] = float(getattr(prices, product, 0))
+    elif t == "FEED":
+        tile = _tile_at(farm, farm.farmer)
+        if isinstance(tile, AnimalState) and tile.animal is not None:
+            product = ANIMAL_CONFIG[tile.animal].product
+            gain["MONEY"] = float(getattr(prices, product, 0))
+    elif t == "CARE":
+        tile = _tile_at(farm, farm.farmer)
+        if isinstance(tile, AnimalState) and tile.animal is not None:
+            product = ANIMAL_CONFIG[tile.animal].product
+            gain["MONEY"] = float(getattr(prices, product, 0))
+    elif t == "FERTILIZE":
+        tile = _tile_at(farm, farm.farmer)
+        if isinstance(tile, PlantState):
+            gain["MONEY"] = float(getattr(prices, tile.crop, 0))
+    elif t == "WATER":
+        tile = _tile_at(farm, farm.farmer)
+        if isinstance(tile, PlantState):
+            gain["MONEY"] = float(getattr(prices, tile.crop, 0))
+    elif t == "DIG":
+        gain["LAND"] = 1.0
+    elif t == "PLACE":
+        if action.item in ANIMAL_CONFIG:
+            product = ANIMAL_CONFIG[action.item].product
+            gain["MONEY"] = float(getattr(prices, product, 0))
     elif t == "HARVEST":
         tile = _tile_at(farm, farm.farmer)
         if isinstance(tile, PlantState) and tile.yield_units > 0:
             gain["MONEY"] = float(tile.yield_units * getattr(prices, tile.crop, 0))
+        elif (isinstance(tile, AnimalState) and tile.animal is not None
+                and tile.yield_units > 0):
+            product = ANIMAL_CONFIG[tile.animal].product
+            gain["MONEY"] = float(tile.yield_units * getattr(prices, product, 0))
     elif t == "COLLECT_FERTILIZER":
         tile = _tile_at(farm, farm.farmer)
         if (isinstance(tile, AnimalState) and tile.animal is not None
@@ -168,28 +204,56 @@ def action_resource_gain(action: ActionState, player: RealityState) -> dict[str,
     return gain
 
 
-def reward_score(action: ActionState, player: RealityState) -> float:
-    gain = action_resource_gain(action, player)
+def scarcity_score(action: ActionState, player: RealityState) -> float:
+    usage = action_resource_usage(action, player)
     avail = available_resources(player)
     weights = player.private.config.resource_weights
     return sum(
-        (gain[r] / max(avail[r], 1.0)) * getattr(weights, r)
+        (usage[r] / max(avail[r], 1.0)) * getattr(weights, r)
+        for r in usage if usage[r] > 0
+    )
+
+
+def cost_score(action: ActionState, player: RealityState) -> float:
+    usage = action_resource_usage(action, player)
+    weights = player.private.config.resource_weights
+    return sum(
+        usage[r] * getattr(weights, r)
+        for r in usage if usage[r] > 0
+    )
+
+
+def reward_score(action: ActionState, player: RealityState) -> float:
+    gain = action_resource_gain(action, player)
+    weights = player.private.config.resource_weights
+    return sum(
+        gain[r] * getattr(weights, r)
         for r in gain if gain[r] > 0
     )
 
 
-def risk_score(action: ActionState, player: RealityState) -> float:
-    return 0.0  # TODO
+def future_cost_score(action: ActionState, player: RealityState) -> float:
+    return 0.0
+
+
+def future_reward_score(action: ActionState, player: RealityState) -> float:
+    return 0.0 # TODO
 
 
 def score_action(action: ActionState, player: RealityState) -> ScoredActionState:
     cost = cost_score(action, player) * player.private.config.score_weights.COST
     reward = reward_score(action, player) * player.private.config.score_weights.REWARD
-    risk = risk_score(action, player) * player.private.config.score_weights.RISK
-    score = reward - (cost + risk) / 2
+
+    future_cost = future_cost_score(action, player) * player.private.config.score_weights.FUTURE_COST
+    future_reward = future_reward_score(action, player) * player.private.config.score_weights.FUTURE_REWARD
+
+    immediate_value = reward - cost
+    future_value = future_reward - future_cost
+
+    score = immediate_value + (future_value * player.private.config.score_weights.FUTURE_DISCOUNT_RATE)
     return ScoredActionState(
         action=action, score=score,
-        cost_score=cost, reward_score=reward, risk_score=risk,
+        cost_score=cost, reward_score=reward, future_cost_score=future_cost,
     )
 
 

@@ -99,32 +99,63 @@ class Player(RealityState):
         self.logger.info("random_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
         return step
 
-    def best_play(self) -> StepState:
-        """Select the highest-scoring valid action for each slot, by score alone.
+    def basic_play(self) -> StepState:
+        """Select highest-scoring valid action for each slot, but only when it
+        beats PASS.
 
-        Farmer and each hand take their single highest-scored action; market
-        takes the top `MAX_MARKET_ORDERS_PER_TURN` highest-scored market
-        actions (no repeats — distinct actions only). Empty slots fall back
-        to PASS.
+        Farmer and each hand take their single highest-scored action, but only
+        if that action's score is strictly positive (PASS scores ≈ 0 since it
+        gains nothing); otherwise the slot falls back to PASS. Market takes the
+        top `MAX_MARKET_ORDERS_PER_TURN` highest-scored market actions *with
+        positive score* — net-negative buys are not dispatched, so the agent no
+        longer drains its bank on animals/land/hands it can't use. Empty slots
+        fall back to PASS.
         """
         scored = score_valid_actions(get_valid_actions(self), self)
-        farmer = (
-            max(scored.farmer, key=lambda s: s.score).action
-            if scored.farmer else PassActionState()
-        )
-        hands = [
-            max(hand, key=lambda s: s.score).action if hand else PassActionState()
-            for hand in scored.hands
-        ]
-        top_market = sorted(scored.market, key=lambda s: s.score, reverse=True)[:MAX_MARKET_ORDERS_PER_TURN]
+        best_farmer = max(scored.farmer, key=lambda s: s.score) if scored.farmer else None
+        farmer = best_farmer.action if best_farmer and best_farmer.score > 0 else PassActionState()
+
+        hands = []
+        for hand in scored.hands:
+            best = max(hand, key=lambda s: s.score) if hand else None
+            hands.append(best.action if best and best.score > 0 else PassActionState())
+
+        positive_market = [s for s in scored.market if s.score > 0]
+        top_market = sorted(positive_market, key=lambda s: s.score, reverse=True)[:MAX_MARKET_ORDERS_PER_TURN]
         market = [s.action for s in top_market]
+
         step = StepState(farmer=farmer, hands=hands, market=market)
-        self.logger.info("best_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
+        self.logger.info("basic_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
         return step
 
-    def tactical_play(self):
-        self.logger.info("tactical_play: player=%s (no-op)", self.player)
-        return StepState()
+    def tactical_play(self) -> StepState:
+        """Select highest-scoring valid action for each slot, but only when it
+        beats PASS.
+
+        Farmer and each hand take their single highest-scored action, but only
+        if that action's score is strictly positive (PASS scores ≈ 0 since it
+        gains nothing); otherwise the slot falls back to PASS. Market takes the
+        top `MAX_MARKET_ORDERS_PER_TURN` highest-scored market actions *with
+        positive score* — net-negative buys are not dispatched, so the agent no
+        longer drains its bank on animals/land/hands it can't use. Empty slots
+        fall back to PASS.
+        """
+        scored = score_valid_actions(get_valid_actions(self), self)
+        best_farmer = max(scored.farmer, key=lambda s: s.score) if scored.farmer else None
+        farmer = best_farmer.action if best_farmer and best_farmer.score > 0 else PassActionState()
+
+        hands = []
+        for hand in scored.hands:
+            best = max(hand, key=lambda s: s.score) if hand else None
+            hands.append(best.action if best and best.score > 0 else PassActionState())
+
+        positive_market = [s for s in scored.market if s.score > 0]
+        top_market = sorted(positive_market, key=lambda s: s.score, reverse=True)[:MAX_MARKET_ORDERS_PER_TURN]
+        market = [s.action for s in top_market]
+
+        step = StepState(farmer=farmer, hands=hands, market=market)
+        self.logger.info("basic_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
+        return step
 
     def play(self) -> StepState:
         method = self.private.config.method
@@ -132,8 +163,8 @@ class Player(RealityState):
         if method == 'RANDOM':
             return self.random_play()
 
-        if method == 'BEST_CHOISE':
-            return self.best_play()
+        if method == 'BASIC':
+            return self.basic_play()
 
         if method == 'TACTICAL':
             return self.tactical_play()

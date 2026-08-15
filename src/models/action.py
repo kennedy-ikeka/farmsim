@@ -23,10 +23,25 @@ class BaseAction(BaseModel, Generic[T]):
 
     type: T = Field(description="The action type tag")
 
+    def to_list(self) -> list:
+        """Serialize to the kaggle env's positional list format: `[op, *args]`.
+
+        Subclasses with payload fields (crop / item+count / animal+count)
+        override this to append those args in the order the env's parser
+        expects (`_parse_order`, `_apply_unit_action` index `action[0..2]`).
+        The base form `[op]` covers ops with no payload (PASS, MOVE, WATER,
+        HARVEST, FERTILIZE, DIG, BUILD_*, FEED, CARE, COLLECT_FERTILIZER,
+        HIRE, BUY_LAND).
+        """
+        return [self.type]
+
 
 class PlantActionState(BaseAction[Literal['PLANT']]):
     """Plant a new crop"""
     crop: CROPS = Field(description="The crop to plant")
+
+    def to_list(self) -> list:
+        return [self.type, self.crop]
 
 
 class MoveActionState(BaseAction[MOVE_ACTIONS]):
@@ -74,11 +89,17 @@ class BuySeedActionState(BaseAction[Literal['BUY_SEED']]):
     crop: CROPS = Field(description="The crop whose seeds are being purchased")
     count: int = Field(description="The number of seed units to buy", gt=0)
 
+    def to_list(self) -> list:
+        return [self.type, self.crop, self.count]
+
 
 class BuyProductActionState(BaseAction[Literal['BUY_PRODUCT']]):
     """Buy a buyable product (only wheat and fertilizer) back from the market."""
     item: BUYABLE_PRODUCTS = Field(description="The product to purchase")
     count: int = Field(description="The number of units to buy", gt=0)
+
+    def to_list(self) -> list:
+        return [self.type, self.item, self.count]
 
 
 class BuyAnimalActionState(BaseAction[Literal['BUY_ANIMAL']]):
@@ -86,11 +107,17 @@ class BuyAnimalActionState(BaseAction[Literal['BUY_ANIMAL']]):
     animal: ANIMALS = Field(description="The animal being purchased")
     count: int = Field(description="The number of animals to buy", gt=0)
 
+    def to_list(self) -> list:
+        return [self.type, self.animal, self.count]
+
 
 class SellActionState(BaseAction[Literal['SELL']]):
     """Sell harvested produce from the shed to the market at the current dynamic sale price."""
     item: SELLABLE_PRODUCTS = Field(description="The product being sold")
     count: int = Field(description="The number of units to sell", gt=0)
+
+    def to_list(self) -> list:
+        return [self.type, self.item, self.count]
 
 
 class HireActionState(BaseAction[Literal["HIRE"]]):
@@ -106,11 +133,17 @@ class PickupActionState(BaseAction[Literal['PICKUP']]):
     item: str = Field(description="The item to pickup")
     count: int = Field(description="The the number of items to pickup", gt=0)
 
+    def to_list(self) -> list:
+        return [self.type, self.item, self.count]
+
 
 class PlaceActionState(BaseAction[Literal['PLACE']]):
     """Place a particular item(s) from the inventory"""
     item: str = Field(description="The item to place")
     count: int = Field(description="The the number of items to place", gt=0)
+
+    def to_list(self) -> list:
+        return [self.type, self.item, self.count]
 
 
 class PassActionState(BaseAction[Literal["PASS"]]):

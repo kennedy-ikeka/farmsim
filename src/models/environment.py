@@ -46,6 +46,23 @@ class StepState(BaseModel):
         description="The next market actions. Empty list if no market actions is needed."
     )
 
+    def to_kaggle(self) -> dict:
+        """Serialize to the kaggle env's positional-list action format.
+
+        The kaggle env parses `farmer` / each `hands` entry / each `market`
+        entry as a list (`action[0]` = op, `action[1..2]` = args) via
+        `_apply_unit_action` / `_parse_order`, which reject dicts. Use this
+        at the agent boundary; the internal `Environment.step` keeps using
+        the typed action objects directly.
+        """
+        step = {
+            "farmer": self.farmer.to_list(),
+            "hands": [h.to_list() for h in self.hands],
+            "market": [m.to_list() for m in self.market],
+        }
+        print(step)
+        return step
+
 
 class StepResultState(BaseModel):
     state: GameState = Field(description="The analyzed state of the game")

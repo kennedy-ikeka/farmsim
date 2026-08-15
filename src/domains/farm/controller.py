@@ -97,6 +97,6 @@ class Farm(FarmState):
                 if isinstance(tile, PlantState):
                     refresh_plant(state, self, r, c, tile)
                 elif isinstance(tile, AnimalState):
-                    refresh_animal(tile)
+                    refresh_animal(tile, state)
                 # None, WeedState, and "LOCKED" tiles need no refresh.
                 

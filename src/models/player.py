@@ -5,12 +5,14 @@ from pydantic import BaseModel, Field
 # How a player chooses actions each turn. Lives here (not in game.py) so
 # `PlayerConfig` can carry a per-player `method` without importing game.py
 # (which imports PrivateState — that would be a circular import).
-PLAY_METHODS = Literal["RANDOM", "BEST_CHOISE", "TACTICAL"]
+PLAY_METHODS = Literal["RANDOM", "BASIC", "TACTICAL"]
 
 class ScoreWeights(BaseModel):
     COST: float = Field(1.0, description="Weight for cost in action scoring.")
     REWARD: float = Field(1.0, description="Weight for reward in action scoring.")
-    RISK: float = Field(1.0, description="Weight for risk in action scoring.")
+    FUTURE_COST: float = Field(1.0, description="Weight for future cost in action scoring.")
+    FUTURE_REWARD: float = Field(1.0, description="Weight for future reward in action scoring.")
+    FUTURE_DISCOUNT_RATE: float = Field(1.0, description="How much we care about the future")
 
 
 class ResourceWeights(BaseModel):
@@ -116,7 +118,7 @@ class PrivateState(BaseModel):
     )
 
     inventories: list[InventoryState] = Field(
-        default=list,
+        default_factory=list,
         description="Per-unit inventories (farmer at index 0, then hired hands)."
     )
 

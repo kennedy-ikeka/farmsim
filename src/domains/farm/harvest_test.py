@@ -4,6 +4,7 @@ from tests.fixtures import _make_env, _play
 from src.domains.farm.harvest import harvest, get_valid_harvest_actions_for
 from src.domains.player.player import Player
 from src.models.crops import CROP_CONFIG
+from src.models.animals import ANIMAL_CONFIG
 from src.models.action import HarvestActionState
 from src.models.environment import StepState
 from src.models.farm import PlantState, WeedState, AnimalState
@@ -17,6 +18,18 @@ def _plant_on_tile(crop="WHEAT", planted_day=0, max_lifespan_step=120,
         planted_day=planted_day,
         max_lifespan_step=max_lifespan_step,
         yield_units=yield_units,
+    )
+
+
+def _animal_on_tile(kind="COOP", animal="GOOSE", yield_units=0,
+                    placed_day=0, fertilizer_available=0):
+    """Build an AnimalState (housed animal) pre-placed at the unit's tile."""
+    return AnimalState(
+        kind=kind,
+        animal=animal,
+        yield_units=yield_units,
+        placed_day=placed_day,
+        fertilizer_available=fertilizer_available,
     )
 
 
@@ -194,12 +207,25 @@ class TestHarvest:
         assert isinstance(farm.tiles[5][5], WeedState)
         assert env.state.privates[0].shed.WHEAT == 0
 
-    def test_noop_on_animal_structure(self):
+    def test_noop_on_empty_animal_structure(self):
+        """A COOP/PASTURE with no animal housed is not harvestable."""
         env = _make_env(farmer=(5, 5), day=3)
         farm = env.state.farms[0]
-        farm.tiles[5][5] = AnimalState(kind="COOP")
+        farm.tiles[5][5] = AnimalState(kind="COOP")  # no animal
         harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
         assert isinstance(farm.tiles[5][5], AnimalState)
+        assert farm.tiles[5][5].animal is None
+
+    def test_noop_on_animal_structure_with_zero_yield(self):
+        """A housed animal with yield_units=0 is not harvestable."""
+        env = _make_env(farmer=(5, 5), day=3)
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _animal_on_tile(animal="GOOSE", yield_units=0)
+        harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
+        assert isinstance(farm.tiles[5][5], AnimalState)
+        assert farm.tiles[5][5].animal == "GOOSE"  # animal stays
+        assert farm.tiles[5][5].yield_units == 0
+        assert env.state.privates[0].shed.EGG == 0
 
     # ---------------------------------------------------------------------------
     # Malformed / out-of-bounds positions are silently skipped.
@@ -233,6 +259,80 @@ class TestHarvest:
     ])
     def test_first_yield_day_matches_crop_config(self, crop, expected):
         assert CROP_CONFIG[crop].first_yield_day == expected
+
+
+class TestHarvestAnimal:
+    """Tests for harvesting produce from housed animals."""
+
+    @pytest.mark.parametrize("animal, kind, product, yield_units", [
+        ("GOOSE", "COOP", "EGG", 1),
+        ("GOOSE", "COOP", "EGG", 4),    # max_held
+        ("COW", "PASTURE", "MILK", 2),
+        ("SHEEP", "PASTURE", "WOOL", 3),
+    ])
+    def test_harvest_animal_deposits_product_and_resets_yield(self, animal, kind, product, yield_units):
+        env = _make_env(farmer=(5, 5), day=10)
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _animal_on_tile(kind=kind, animal=animal, yield_units=yield_units)
+
+        result = harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
+
+        assert getattr(env.state.privates[0].shed, product) == yield_units
+        tile = farm.tiles[5][5]
+        assert isinstance(tile, AnimalState)  # structure stays
+        assert tile.animal == animal           # animal stays
+        assert tile.yield_units == 0           # yield reset for next production
+        assert result["yield"] == yield_units
+        assert result["animal"] == animal
+        assert result["product"] == product
+
+    def test_harvest_animal_adds_to_existing_shed_stock(self):
+        env = _make_env(farmer=(5, 5), day=10)
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _animal_on_tile(animal="GOOSE", yield_units=2)
+        env.state.privates[0].shed.EGG = 3
+
+        harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
+
+        assert env.state.privates[0].shed.EGG == 5
+
+    def test_harvest_animal_does_not_touch_other_shed_slots(self):
+        env = _make_env(farmer=(5, 5), day=10)
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _animal_on_tile(animal="COW", yield_units=2)
+        env.state.privates[0].shed.WOOL = 4
+
+        harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
+
+        assert env.state.privates[0].shed.MILK == 2
+        assert env.state.privates[0].shed.WOOL == 4  # untouched
+
+    def test_harvest_animal_preserves_structure_kind(self):
+        """The structure (COOP/PASTURE) stays on the tile after harvest."""
+        env = _make_env(farmer=(5, 5), day=10)
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _animal_on_tile(kind="PASTURE", animal="SHEEP", yield_units=1)
+
+        harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
+
+        tile = farm.tiles[5][5]
+        assert isinstance(tile, AnimalState)
+        assert tile.kind == "PASTURE"  # structure preserved
+
+    def test_harvest_animal_can_harvest_again_after_next_production(self):
+        """Two harvests each collect yield as it accumulates."""
+        env = _make_env(farmer=(5, 5), day=10)
+        farm = env.state.farms[0]
+        farm.tiles[5][5] = _animal_on_tile(animal="GOOSE", yield_units=2)
+
+        harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
+        assert env.state.privates[0].shed.EGG == 2
+        assert farm.tiles[5][5].yield_units == 0
+
+        # Later, more yield accumulates from production.
+        farm.tiles[5][5].yield_units = 3
+        harvest(env.state, farm, farm.farmer, HarvestActionState(type="HARVEST"))
+        assert env.state.privates[0].shed.EGG == 5
 
 
 class TestHarvestDispatch:
@@ -329,3 +429,28 @@ class TestGetValidHarvestActionsFor:
         assert len(actions) == 1
         assert isinstance(actions[0], HarvestActionState)
         assert actions[0].type == "HARVEST"
+
+    def test_housed_animal_with_yield_returns_one_action(self):
+        env = _make_env(farmer=(5, 5), day=10)
+        env.state.farms[0].tiles[5][5] = _animal_on_tile(
+            animal="GOOSE", yield_units=2
+        )
+        player = _player_from(env)
+        actions = get_valid_harvest_actions_for(player, [5, 5])
+        assert len(actions) == 1
+        assert isinstance(actions[0], HarvestActionState)
+
+    def test_empty_animal_structure_returns_empty(self):
+        """A COOP with no animal housed is not harvestable."""
+        env = _make_env(farmer=(5, 5), day=10)
+        env.state.farms[0].tiles[5][5] = AnimalState(kind="COOP")  # no animal
+        player = _player_from(env)
+        assert get_valid_harvest_actions_for(player, [5, 5]) == []
+
+    def test_housed_animal_with_zero_yield_returns_empty(self):
+        env = _make_env(farmer=(5, 5), day=10)
+        env.state.farms[0].tiles[5][5] = _animal_on_tile(
+            animal="GOOSE", yield_units=0
+        )
+        player = _player_from(env)
+        assert get_valid_harvest_actions_for(player, [5, 5]) == []

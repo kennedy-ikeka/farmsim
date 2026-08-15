@@ -50,37 +50,44 @@ class TestSimulate:
         env.simulate(
             steps=0,
             player_configs=[
-                PlayerConfig(method="BEST_CHOISE", resource_weights=ResourceWeights(STEP=3.0)),
+                PlayerConfig(method="BASIC", resource_weights=ResourceWeights(STEP=3.0)),
                 PlayerConfig(method="TACTICAL", resource_weights=ResourceWeights(MONEY=5.0)),
             ],
         )
-        assert env.state.privates[0].config.method == "BEST_CHOISE"
+        assert env.state.privates[0].config.method == "BASIC"
         assert env.state.privates[0].config.resource_weights.STEP == 3.0
         assert env.state.privates[1].config.method == "TACTICAL"
         assert env.state.privates[1].config.resource_weights.MONEY == 5.0
 
     def test_simulate_returns_balances_and_winner(self):
-        """simulate returns SimulationResultState with balances and winner."""
+        """simulate returns SimulationResultState with balances and winner.
+
+        simulate rebuilds the env via build() (money=3000 for both players);
+        with steps=0 no turns run, so both balances stay equal → tie → None.
+        """
         env = _make_env(players=2)
-        # Both start with 0 money → tie → winner is None.
-        result = env.simulate(steps=1)
+        result = env.simulate(steps=0)
         assert set(result.balances.keys()) == {0, 1}
         assert result.winner is None  # tie on equal balances
 
     def test_simulate_winner_is_highest_balance(self, monkeypatch):
-        """Winner is the player id with the highest final balance."""
+        """Winner is the player id with the highest final balance.
+
+        simulate rebuilds via build() at start, which would wipe any pre-set
+        money, so build is patched to a no-op to preserve the skewed balances.
+        """
         env = _make_env(players=2)
-        env.step()  # run a turn so state has farms
-        # Skew balances: player 1 ends richer.
+        monkeypatch.setattr(Environment, "build", lambda self, *a, **kw: None)
         env.state.farms[0].money = 100.0
         env.state.farms[1].money = 500.0
         result = env.simulate(steps=0)
         assert result.balances == {0: 100.0, 1: 500.0}
         assert result.winner == 1
 
-    def test_simulate_winner_none_on_tie(self):
+    def test_simulate_winner_none_on_tie(self, monkeypatch):
         """When balances are exactly equal, winner is None."""
         env = _make_env(players=2)
+        monkeypatch.setattr(Environment, "build", lambda self, *a, **kw: None)
         env.state.farms[0].money = 300.0
         env.state.farms[1].money = 300.0
         result = env.simulate(steps=0)
@@ -97,7 +104,7 @@ class TestSimulate:
         """
         env = _make_env(players=2)
         env.state.privates[0].config = PlayerConfig(
-            method="BEST_CHOISE", resource_weights=ResourceWeights(STEP=3.0)
+            method="BASIC", resource_weights=ResourceWeights(STEP=3.0)
         )
         env.state.privates[1].config = PlayerConfig(
             method="TACTICAL", resource_weights=ResourceWeights(MONEY=5.0)
@@ -119,7 +126,7 @@ class TestSimulate:
         env.step()
 
         by_player = {c["player"]: c for c in captured}
-        assert by_player[0]["method"] == "BEST_CHOISE"
+        assert by_player[0]["method"] == "BASIC"
         assert by_player[0]["weights"].STEP == 3.0
         assert by_player[1]["method"] == "TACTICAL"
         assert by_player[1]["weights"].MONEY == 5.0
@@ -129,7 +136,7 @@ class TestSimulate:
         env = _make_env(players=2)
         # Override only player 0; player 1 stays at the default PlayerConfig().
         env.state.privates[0].config = PlayerConfig(
-            method="BEST_CHOISE", resource_weights=ResourceWeights(STEP=3.0)
+            method="BASIC", resource_weights=ResourceWeights(STEP=3.0)
         )
 
         captured = []
@@ -147,5 +154,5 @@ class TestSimulate:
         env.step()
 
         by_player = {c["player"]: c for c in captured}
-        assert by_player[0]["method"] == "BEST_CHOISE"
+        assert by_player[0]["method"] == "BASIC"
         assert by_player[1]["method"] == "RANDOM"  # PlayerConfig() default
