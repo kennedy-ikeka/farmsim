@@ -6,7 +6,8 @@ from src.domains.farm import Farm
 from src.domains.market import Market
 from src.domains.player.player import Player
 from src.domains.environment.environment import Environment
-from src.models.player import PlayerConfig, ScoreWeights, ResourceWeights, PrivateState, ShedState, SeedsState
+from src.models.player import PlayerConfig, ScoreWeights, PrivateState, ShedState, SeedsState
+from src.models.resource import ResourceState
 from src.models.market import MarketInventory, MarketPrices
 from src.models.game import SharedRealityState
 from src.utils.config import EPISODE_STEPS
@@ -86,10 +87,10 @@ def run(cfg, label):
 
 run(PlayerConfig(method="BASIC",
                  score_weights=ScoreWeights(COST=1, REWARD=100),
-                 resource_weights=ResourceWeights(MONEY=1e9, LAND=0, SEED=0, ANIMAL=0, HAND=0, STEP=1)),
+                 resource_needs=ResourceState(MONEY=1e9, LAND=0, SEED=0, ANIMAL=0, HAND=0, STEP=1)),
     "A: MONEY=1e9, LAND=0")
 
 run(PlayerConfig(method="BASIC",
                  score_weights=ScoreWeights(COST=1, REWARD=100),
-                 resource_weights=ResourceWeights(MONEY=1, STEP=1, SEED=1, LAND=1, ANIMAL=1, HAND=1)),
+                 resource_needs=ResourceState(MONEY=1, STEP=1, SEED=1, LAND=1, ANIMAL=1, HAND=1)),
     "B: all weights=1 (real prices)")

@@ -1,8 +1,19 @@
 """Tests for `Environment.simulate`."""
 from src.domains.environment.environment import Environment
-from src.models.player import PlayerConfig, ResourceWeights
+from src.models.player import PlayerConfig
+from src.models.resource import ResourceState
+from src.models.scoring import ScoredValidStepsState
 from src.domains.player.player import Player
 from tests.fixtures import _make_env
+
+
+def _stub_score_valid_actions(valid_steps, player):
+    """Empty scored steps — basic_play falls back to all-PASS.
+
+    Used while the scoring module is being rebuilt so the simulate plumbing
+    tests don't depend on the (incomplete) `score_action` implementation.
+    """
+    return ScoredValidStepsState()
 
 
 class TestSimulate:
@@ -44,20 +55,24 @@ class TestSimulate:
         env.simulate(steps=2)
         assert len(calls) == 2
 
-    def test_simulate_sets_per_player_states(self):
+    def test_simulate_sets_per_player_states(self, monkeypatch):
         """simulate(player_configs=...) writes each config onto private.config."""
+        monkeypatch.setattr(
+            "src.domains.player.player.score_valid_actions",
+            _stub_score_valid_actions,
+        )
         env = _make_env(players=2)
         env.simulate(
             steps=0,
             player_configs=[
-                PlayerConfig(method="BASIC", resource_weights=ResourceWeights(STEP=3.0)),
-                PlayerConfig(method="TACTICAL", resource_weights=ResourceWeights(MONEY=5.0)),
+                PlayerConfig(method="BASIC", resource_needs=ResourceState(STEP=3.0)),
+                PlayerConfig(method="RANDOM", resource_needs=ResourceState(MONEY=5.0)),
             ],
         )
         assert env.state.privates[0].config.method == "BASIC"
-        assert env.state.privates[0].config.resource_weights.STEP == 3.0
-        assert env.state.privates[1].config.method == "TACTICAL"
-        assert env.state.privates[1].config.resource_weights.MONEY == 5.0
+        assert env.state.privates[0].config.resource_needs.STEP == 3.0
+        assert env.state.privates[1].config.method == "RANDOM"
+        assert env.state.privates[1].config.resource_needs.MONEY == 5.0
 
     def test_simulate_returns_balances_and_winner(self):
         """simulate returns SimulationResultState with balances and winner.
@@ -96,18 +111,22 @@ class TestSimulate:
     def test_step_uses_per_player_config_from_privates(self, monkeypatch):
         """Environment.step builds Player views that read config from private.
 
-        Each player's `method` and `resource_weights` travel on
+        Each player's `method` and `resource_needs` travel on
         `state.privates[p].config`; step() passes the private into the
         Player view, which reads `self.private.config` for play dispatch
         and scoring. Patches `Player.__init__` to capture the `private`
         kwarg and checks each view got the right config.
         """
+        monkeypatch.setattr(
+            "src.domains.player.player.score_valid_actions",
+            _stub_score_valid_actions,
+        )
         env = _make_env(players=2)
         env.state.privates[0].config = PlayerConfig(
-            method="BASIC", resource_weights=ResourceWeights(STEP=3.0)
+            method="BASIC", resource_needs=ResourceState(STEP=3.0)
         )
         env.state.privates[1].config = PlayerConfig(
-            method="TACTICAL", resource_weights=ResourceWeights(MONEY=5.0)
+            method="RANDOM", resource_needs=ResourceState(MONEY=5.0)
         )
 
         captured = []
@@ -118,7 +137,7 @@ class TestSimulate:
             captured.append({
                 "player": kwargs.get("player"),
                 "method": priv.config.method,
-                "weights": priv.config.resource_weights.model_copy(),
+                "weights": priv.config.resource_needs.model_copy(),
             })
             return real_init(self, *args, **kwargs)
 
@@ -128,15 +147,19 @@ class TestSimulate:
         by_player = {c["player"]: c for c in captured}
         assert by_player[0]["method"] == "BASIC"
         assert by_player[0]["weights"].STEP == 3.0
-        assert by_player[1]["method"] == "TACTICAL"
+        assert by_player[1]["method"] == "RANDOM"
         assert by_player[1]["weights"].MONEY == 5.0
 
     def test_step_defaults_player_config_when_unset(self, monkeypatch):
         """A private whose config was never touched keeps PlayerConfig() defaults."""
+        monkeypatch.setattr(
+            "src.domains.player.player.score_valid_actions",
+            _stub_score_valid_actions,
+        )
         env = _make_env(players=2)
         # Override only player 0; player 1 stays at the default PlayerConfig().
         env.state.privates[0].config = PlayerConfig(
-            method="BASIC", resource_weights=ResourceWeights(STEP=3.0)
+            method="BASIC", resource_needs=ResourceState(STEP=3.0)
         )
 
         captured = []

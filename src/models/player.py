@@ -2,12 +2,12 @@ from typing_extensions import Literal
 
 from pydantic import BaseModel, Field
 
-from src.models.resource import ResourceWeights
+from src.models.resource import ResourceState
 
 # How a player chooses actions each turn. Lives here (not in game.py) so
 # `PlayerConfig` can carry a per-player `method` without importing game.py
 # (which imports PrivateState — that would be a circular import).
-PLAY_METHODS = Literal["RANDOM", "BASIC", "TACTICAL"]
+PLAY_METHODS = Literal["RANDOM", "BASIC"]
 
 class ScoreWeights(BaseModel):
     COST: float = Field(1.0, description="Weight for cost in action scoring.")
@@ -30,9 +30,9 @@ class PlayerConfig(BaseModel):
         'RANDOM',
         description="How this player chooses actions each turn."
     )
-    resource_weights: ResourceWeights = Field(
-        default_factory=ResourceWeights,
-        description="Per-resource scoring weights for this player."
+    resource_needs: ResourceState = Field(
+        default_factory=ResourceState,
+        description="Per-resource needs for this player."
     )
     score_weights: ScoreWeights = Field(
         default_factory=ScoreWeights,

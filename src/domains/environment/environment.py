@@ -54,6 +54,49 @@ class Environment(EnvironmentState):
     clock: Clock = Field(default_factory=Clock)
     logger: ClassVar[logging.Logger] = get_logger("Environment")
 
+    def build(self, rows=10, cols=10, money=3000, farmer=(5, 5), hands=None, tiles=None, seeds=None, day=0, step=0, players=2, player_configs:list[PlayerConfig]=[]):
+        shed = ShedState(**{k: 0 for k in SHED_FIELDS})
+        seeds = SeedsState(**{k: 0 for k in SEED_FIELDS})
+
+        inv = MarketInventory(**{k: 0 for k in MARKET_FIELDS})
+        prices = MarketPrices(**{k: 1 for k in MARKET_FIELDS})
+        market = Market(inventory=inv, prices=prices)
+
+        if tiles is None:
+            tiles = [[None] * cols for _ in range(rows)]
+
+        build_farm = lambda: Farm(
+            money=money,
+            tiles=[[None if cell is None else cell for cell in row]
+                   for row in tiles],
+            farmer=list(farmer),
+            hands=hands if hands is not None else [],
+            unlocked_quadrants=["NW"],
+            hires_today=0,
+        )
+
+        farms = [build_farm() for _ in range(players)]
+        configs = (
+            list(player_configs) if player_configs
+            else [PlayerConfig() for _ in range(players)]
+        )
+        privates = [
+            PrivateState(shed=shed, seeds=seeds, inventories=[], config=configs[p])
+            for p in range(players)
+        ]
+
+        self.state = SharedRealityState(
+            remainingOverageTime=60,
+            step=step,
+            day=day,
+            hour=step % 24,
+            farms=farms,
+            privates=privates,
+            market=market,
+            town=Town(unlocked_shops=[]),
+        )
+        self.logger.info("build: players=%s money=%s farmer=%s rows=%s cols=%s", players, money, farmer, rows, cols)
+
     def step(self):
         """Apply all players' actions for a single step to `state`, in place.
 
@@ -72,7 +115,7 @@ class Environment(EnvironmentState):
         state = self.state
 
         # 1. Farm actions — each player's farmer + hands, with state.player = p.
-        #    Each player's `method` and `resource_weights` travel on
+        #    Each player's `method` and `resource_needs` travel on
         #    `state.privates[p].config`, so the per-player Player view gets
         #    them for free via its `private` field — no separate injection.
         shared = self.state.model_dump(
@@ -119,54 +162,11 @@ class Environment(EnvironmentState):
             done=self.done,
         )
 
-    def build(self, rows=10, cols=10, money=3000, farmer=(5, 5), hands=None, tiles=None, seeds=None, day=0, step=0, players=2, player_configs:list[PlayerConfig]=[]):
-        shed = ShedState(**{k: 0 for k in SHED_FIELDS})
-        seeds = SeedsState(**{k: 0 for k in SEED_FIELDS})
-
-        inv = MarketInventory(**{k: 0 for k in MARKET_FIELDS})
-        prices = MarketPrices(**{k: 1 for k in MARKET_FIELDS})
-        market = Market(inventory=inv, prices=prices)
-
-        if tiles is None:
-            tiles = [[None] * cols for _ in range(rows)]
-
-        build_farm = lambda: Farm(
-            money=money,
-            tiles=[[None if cell is None else cell for cell in row]
-                   for row in tiles],
-            farmer=list(farmer),
-            hands=hands if hands is not None else [],
-            unlocked_quadrants=["NW"],
-            hires_today=0,
-        )
-
-        farms = [build_farm() for _ in range(players)]
-        configs = (
-            list(player_configs) if player_configs
-            else [PlayerConfig() for _ in range(players)]
-        )
-        privates = [
-            PrivateState(shed=shed, seeds=seeds, inventories=[], config=configs[p])
-            for p in range(players)
-        ]
-
-        self.state = SharedRealityState(
-            remainingOverageTime=60,
-            step=step,
-            day=day,
-            hour=step % 24,
-            farms=farms,
-            privates=privates,
-            market=market,
-            town=Town(unlocked_shops=[]),
-        )
-        self.logger.info("build: players=%s money=%s farmer=%s rows=%s cols=%s", players, money, farmer, rows, cols)
-
     def simulate(self, steps: int, player_configs:list[PlayerConfig]=[]) -> SimulationResultState:
         """Run `steps` turns, each player playing per-turn, then step the world.
 
         `player_configs` (optional) overrides the per-player configuration
-        (`method` + `resource_weights`) before running — each `PlayerConfig`
+        (`method` + `resource_needs`) before running — each `PlayerConfig`
         is written onto the matching player's `private.config`. Length must
         match the number of players.
 

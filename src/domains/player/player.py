@@ -6,15 +6,14 @@ from src.utils.config import MAX_MARKET_ORDERS_PER_TURN
 from src.domains.farm import Farm
 from src.domains.market import Market
 from src.models.action import PassActionState
-from src.models.game import RealityState, SharedRealityState
+from src.models.game import RealityState
 from src.models.environment import StepState
-from src.models.player import PlayerConfig, ShedState, SeedsState, PrivateState, ResourceWeights
+from src.models.player import PlayerConfig, ShedState, SeedsState, PrivateState
+from src.models.resource import ResourceState
 from src.models.market import MarketInventory, MarketPrices
 from src.domains.player.valid_actions import get_valid_actions
 from src.domains.player.scoring import (
     score_valid_actions,
-    score_action,
-    update_resource_weights,
 )
 from src.utils.logger import get_logger
 
@@ -25,7 +24,7 @@ class Player(RealityState):
               tiles=None, shed=None, day=0, step=0, inventories=None,
               money=0.0, market_inventory=None, market_prices=None,
               hires_today=0, unlocked_quadrants=None,
-              method='RANDOM', resource_weights=None):
+              method='RANDOM', resource_needs=None):
         """Build a Player view over a single-player env, pre-populating player 0.
 
         Mirrors `Environment.build` — assembles a one-farm / one-private state
@@ -54,7 +53,9 @@ class Player(RealityState):
             inventories=list(inventories) if inventories else [],
             config=PlayerConfig(
                 method=method,
-                resource_weights=resource_weights if resource_weights is not None else ResourceWeights(),
+                resource_needs=resource_needs if resource_needs is not None else ResourceState(
+                    MONEY=1.0, STEP=1.0, SEED=1.0, LAND=1.0, ANIMAL=1.0, HAND=1.0, PRODUCE=1.0,
+                ),
             ),
         )
 
@@ -104,95 +105,41 @@ class Player(RealityState):
         return step
 
     def basic_play(self) -> StepState:
-        """Shared scoring-based selection for BASIC / TACTICAL.
+        """Simple scoring-based selection for BASIC.
 
-        Each action is picked by scoring valid actions, then SIMULATED on a
-        deep copy of the state before re-planning the next. This means:
-
-        - After buying an animal (money drops), the next buy is re-scored
-          against the reduced bank balance — unaffordable buys vanish from
-          valid actions and scarcity rises on the rest.
-        - After planting on a tile, the next hand sees that tile occupied.
-        - Weights satiate after each pick so the resource that drove one
-          action is less influential for the next.
-
-        The simulation copy is discarded after selection; the real state is
-        left clean for `Environment.step` to execute the chosen actions.
-        Only the satiated weights are written back to the real player.
+        Score the valid actions once, and pick the highest-scoring action for
+        each slot (farmer, each hired hand, market). No simulation or
+        re-planning — `Environment.step` executes the chosen actions against
+        the real state.
         """
-        # --- Build a simulation copy with Farm/Market controllers ----------
-        sim = self.model_copy(deep=True)
-        sim.farms = [
-            f if isinstance(f, Farm) else Farm(**f.model_dump())
-            for f in sim.farms
-        ]
-        if not isinstance(sim.market, Market):
-            sim.market = Market(**sim.market.model_dump())
-        # SharedRealityState view over the same refs — action execution
-        # functions read `state.privates[state.player]`, not `state.private`.
-        # Place sim.private at index sim.player so the lookup resolves for
-        # any player id (other slots are dummies — only the active player's
-        # state is mutated during simulation).
-        privates = [PrivateState() for _ in range(sim.player)]
-        privates.append(sim.private)
-        sim_shared = SharedRealityState(
-            remainingOverageTime=sim.remainingOverageTime,
-            step=sim.step, day=sim.day, hour=sim.hour, player=sim.player,
-            farms=sim.farms, market=sim.market, town=sim.town,
-            privates=privates,
+        valid = get_valid_actions(self)
+        scored = score_valid_actions(valid, self)
+        print(scored)
+
+        # Farmer — best action with score > 0, else PASS.
+        farmer = (
+            max(scored.farmer, key=lambda s: s.score).action
+            if scored.farmer and max(s.score for s in scored.farmer) > 0
+            else PassActionState()
         )
 
-        # --- Farmer --------------------------------------------------------
-        valid = get_valid_actions(sim)
-        farmer_scored = [score_action(a, sim) for a in valid.farmer]
-        best_farmer = max(farmer_scored, key=lambda s: s.score) if farmer_scored else None
-        if best_farmer and best_farmer.score > 0:
-            farmer = best_farmer.action
-            sim.farms[sim.player].apply(
-                sim_shared, sim.farms[sim.player].farmer, best_farmer.action, 0
-            )
-            update_resource_weights(sim, [best_farmer])
-        else:
-            farmer = PassActionState()
-
-        # --- Hands (re-plan from simulated state after each pick) ----------
+        # Hands — best action per hand with score > 0, else PASS.
         hands = []
-        num_hands = len(sim.farms[sim.player].hands)
-        for hand_idx in range(num_hands):
-            valid = get_valid_actions(sim)
-            hand_actions = valid.hands[hand_idx] if hand_idx < len(valid.hands) else []
-            hand_scored = [score_action(a, sim) for a in hand_actions]
-            best = max(hand_scored, key=lambda s: s.score) if hand_scored else None
-            if best and best.score > 0:
-                hands.append(best.action)
-                sim.farms[sim.player].apply(
-                    sim_shared,
-                    sim.farms[sim.player].hands[hand_idx],
-                    best.action, hand_idx + 1,
-                )
-                update_resource_weights(sim, [best])
+        for hand_scored in scored.hands:
+            if hand_scored and max(s.score for s in hand_scored) > 0:
+                hands.append(max(hand_scored, key=lambda s: s.score).action)
             else:
                 hands.append(PassActionState())
 
-        # --- Market (greedy: pick, simulate, re-plan, repeat) --------------
-        market = []
-        for _ in range(MAX_MARKET_ORDERS_PER_TURN):
-            valid = get_valid_actions(sim)
-            if not valid.market:
-                break
-            scored = [score_action(a, sim) for a in valid.market]
-            best = max(scored, key=lambda s: s.score)
-            if best.score <= 0:
-                break
-            market.append(best.action)
-            sim.market.apply(sim_shared, best.action)
-            update_resource_weights(sim, [best])
-
-        # --- Persist satiated weights to the real player -------------------
-        self.private.config.resource_weights = sim.private.config.resource_weights
+        # Market — top-N scored actions with score > 0 (no re-plan).
+        positive = sorted(
+            (s for s in scored.market if s.score > 0),
+            key=lambda s: s.score, reverse=True,
+        )
+        market = [s.action for s in positive[:MAX_MARKET_ORDERS_PER_TURN]]
 
         step = StepState(farmer=farmer, hands=hands, market=market)
-        self.logger.info("%s: player=%s farmer=%s hands=%s market=%s", 'basic_play', self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
+        self.logger.info("basic_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
         return step
 
     def play(self) -> StepState:
@@ -203,9 +150,6 @@ class Player(RealityState):
 
         if method == 'BASIC':
             return self.basic_play()
-
-        if method == 'TACTICAL':
-            return self.tactical_play()
 
         self.logger.warning("play: unknown method=%s, falling back to PASS", method)
         return StepState()
