@@ -13,6 +13,7 @@ class ResourceState(BaseModel):
     STEP: float = Field(0, description="Value for step/turn usage in action scoring.")
     SEED: float = Field(0, description="Value for seed value in action scoring.")
     LAND: float = Field(0, description="Value for empty land tiles in action scoring.")
+    STRUCTURE: float = Field(0, description="Value for structure in action scoring.")
     ANIMAL: float = Field(0, description="Value for animal value in action scoring.")
     HAND: float = Field(0, description="Value for hired hands in action scoring.")
     PRODUCE: float = Field(0, description="Value for produce in action scoring.")

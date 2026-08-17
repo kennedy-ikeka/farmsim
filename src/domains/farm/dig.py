@@ -1,7 +1,5 @@
-from src.models.action import DigActionState, ActionState
+from src.models.action import DigActionState
 from src.models.farm import PlantState, WeedState, AnimalState
-from src.models.resource import ResourceState
-from src.models.game import RealityState
 from src.utils.farm import in_bounds
 
 
@@ -63,8 +61,3 @@ def get_valid_dig_actions_for(farm, unit_pos) -> list[DigActionState]:
     if isinstance(tile, AnimalState) and tile.animal is None:
         return [DigActionState(type="DIG")]
     return []
-
-
-def dig_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
-    """DIG clears an occupied tile, yielding one empty land tile."""
-    return ResourceState(LAND=1.0)

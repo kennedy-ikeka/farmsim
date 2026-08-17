@@ -1,6 +1,4 @@
-from src.models.action import BuyLandActionState, ActionState
-from src.models.resource import ResourceState
-from src.models.game import RealityState
+from src.models.action import BuyLandActionState
 
 
 # Unlock order (cheapest first) and fixed cost per quadrant.
@@ -56,43 +54,6 @@ def get_valid_buy_land_actions(player) -> list[BuyLandActionState]:
     if farm.money < QUADRANT_COST[next_quad]:
         return []
     return [BuyLandActionState(type="BUY_LAND")]
-
-
-def _next_quadrant(farm):
-    """First quadrant in QUADRANT_ORDER not yet unlocked, or None."""
-    for q in QUADRANT_ORDER:
-        if q not in farm.unlocked_quadrants:
-            return q
-    return None
-
-
-def buy_land_resource_usage(action: ActionState, player: RealityState) -> ResourceState:
-    """BUY_LAND costs the next quadrant's fixed price MONEY and one step."""
-    farm = player.farms[player.player]
-    q = _next_quadrant(farm)
-    return ResourceState(
-        STEP=1.0,
-        MONEY=float(QUADRANT_COST[q]) if q else 0.0,
-    )
-
-
-def buy_land_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
-    """Immediate LAND gained = tile count of the next quadrant to unlock."""
-    farm = player.farms[player.player]
-    q = _next_quadrant(farm)
-    if q is None:
-        return ResourceState()
-    rows = len(farm.tiles)
-    cols = len(farm.tiles[0]) if rows else 0
-    half_r, half_c = rows // 2, cols // 2
-    ranges = {
-        "NW": (0, half_r, 0, half_c),
-        "NE": (0, half_r, half_c, cols),
-        "SW": (half_r, rows, 0, half_c),
-        "SE": (half_r, rows, half_c, cols),
-    }
-    r0, r1, c0, c1 = ranges[q]
-    return ResourceState(LAND=float((r1 - r0) * (c1 - c0)))
 
 
 def _unlock_quadrant(farm, quadrant):

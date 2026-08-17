@@ -179,3 +179,25 @@ class TestSimulate:
         by_player = {c["player"]: c for c in captured}
         assert by_player[0]["method"] == "BASIC"
         assert by_player[1]["method"] == "RANDOM"  # PlayerConfig() default
+
+    def test_simulate_runs_basic_play_end_to_end(self):
+        """simulate with BASIC players exercises the real score_action path.
+
+        Regression guard: `Environment.step` reconstructs Player views from a
+        JSON dump, so the views carry plain `FarmState` / `MarketState` (not
+        the `Farm` / `Market` controllers). `apply_action` must re-wrap them
+        so `Farm.apply` / `Market.apply` exist when scoring. Without the
+        re-wrap this raises `AttributeError: 'FarmState' object has no
+        attribute 'apply'`.
+        """
+        env = _make_env(players=2)
+        result = env.simulate(
+            steps=4,
+            player_configs=[
+                PlayerConfig(method="BASIC", resource_needs=ResourceState(MONEY=1.0)),
+                PlayerConfig(method="RANDOM"),
+            ],
+        )
+        # Both players completed 4 steps without raising.
+        assert set(result.balances.keys()) == {0, 1}
+        assert result.done is False

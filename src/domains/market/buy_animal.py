@@ -1,8 +1,5 @@
 from src.models.animals import ANIMAL_CONFIG
-from src.models.action import BuyAnimalActionState, ActionState
-from src.models.resource import ResourceState
-from src.models.game import RealityState
-from src.domains.farm.production import animal_future_production
+from src.models.action import BuyAnimalActionState
 
 
 def buy_animal(state, action: BuyAnimalActionState) -> dict:
@@ -40,34 +37,3 @@ def get_valid_buy_animal_actions(player) -> list[BuyAnimalActionState]:
         for animal, cfg in ANIMAL_CONFIG.items()
         if farm.money >= cfg.cost
     ]
-
-
-def buy_animal_resource_usage(action: ActionState, player: RealityState) -> ResourceState:
-    """BUY_ANIMAL costs `count * animal.cost` MONEY and one step."""
-    return ResourceState(
-        STEP=1.0,
-        MONEY=float(action.count * ANIMAL_CONFIG[action.animal].cost),
-    )
-
-
-def buy_animal_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
-    """Immediate ANIMAL gained (valued at economic value = count * cost)."""
-    return ResourceState(
-        ANIMAL=float(action.count * ANIMAL_CONFIG[action.animal].cost)
-    )
-
-
-def buy_animal_future_gain(action: ActionState, player: RealityState) -> ResourceState:
-    """Each animal enables one PLACE → its full production + fertilizer under
-    optimal completion. PRODUCE = future product + fertilizer units the bought
-    animals will produce. Deployment costs are counted at PLACE time, so
-    future_usage here is {}."""
-    if action.animal not in ANIMAL_CONFIG:
-        return ResourceState()
-    y, f = animal_future_production(action.animal, player.day)
-    product = ANIMAL_CONFIG[action.animal].product
-    prices = player.market.prices
-    return ResourceState(
-        MONEY=float(action.count * (y * getattr(prices, product, 0) + f * getattr(prices, "FERTILIZER", 0))),
-        PRODUCE=float(action.count * (y + f)),
-    )

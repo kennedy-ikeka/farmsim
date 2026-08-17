@@ -1,9 +1,6 @@
 from src.models.farm import AnimalState
-from src.models.action import CareActionState, ActionState
-from src.models.resource import ResourceState
-from src.models.game import RealityState
-from src.models.animals import ANIMAL_CONFIG
-from src.utils.farm import in_bounds, tile_at
+from src.models.action import CareActionState
+from src.utils.farm import in_bounds
 
 
 def care(farm, unit_pos, action) -> dict:
@@ -55,22 +52,3 @@ def get_valid_care_actions_for(farm, unit_pos) -> list[CareActionState]:
     if tile.cared_today:
         return []
     return [CareActionState(type="CARE")]
-
-
-def care_future_gain(action: ActionState, player: RealityState) -> ResourceState:
-    """Deferred MONEY: caring banks one bonus production unit's worth of the
-    animal's product (valued at its market price). PRODUCE = 1 product unit."""
-    farm = player.farms[player.player]
-    tile = tile_at(farm, farm.farmer)
-    if isinstance(tile, AnimalState) and tile.animal is not None:
-        product = ANIMAL_CONFIG[tile.animal].product
-        return ResourceState(
-            MONEY=float(getattr(player.market.prices, product, 0)),
-            PRODUCE=1.0,
-        )
-    return ResourceState()
-
-
-def care_future_usage(action: ActionState, player: RealityState) -> ResourceState:
-    """Downstream steps to realize the gain: one harvest + one sell."""
-    return ResourceState(STEP=2.0)

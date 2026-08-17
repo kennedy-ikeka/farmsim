@@ -8,7 +8,7 @@ from src.models.environment import ValidStepsState
 class ScoredActionState(BaseModel):
     """A valid action paired with its scoring breakdown."""
     action: ActionState = Field(description="The action being scored.")
-    score: float = Field(0.0, description="direct_score + future_score ")
+    score: float = Field(0.0, description="direct_score + projected_score - risk_score")
     direct_score: float = Field(0.0, description="Direct score for this action.")
     projected_score: float = Field(0.0, description="Projected score for this action.")
     risk_score: float = Field(0.0, description="Risk score for this action")

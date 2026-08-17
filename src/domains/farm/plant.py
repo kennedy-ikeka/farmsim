@@ -1,11 +1,9 @@
 from src.models.game import RealityState
 from src.utils.config import TURNS_PER_DAY
 from src.models.crops import CROP_CONFIG
-from src.models.action import PlantActionState, ActionState
+from src.models.action import PlantActionState
 from src.models.farm import PlantState
-from src.models.resource import ResourceState
 from src.utils.farm import in_bounds
-from src.domains.farm.production import crop_future_yield, crop_window_days_remaining
 
 
 def plant(state, farm, unit_pos, action: PlantActionState) -> dict:
@@ -73,35 +71,3 @@ def get_valid_plant_actions_for(player: RealityState, unit_pos) -> list[PlantAct
         for crop in type(seeds).model_fields
         if getattr(seeds, crop, 0) > 0
     ]
-
-
-def plant_resource_usage(action: ActionState, player: RealityState) -> ResourceState:
-    """PLANT consumes one seed (valued at seed_cost), one empty tile, and one step."""
-    return ResourceState(
-        STEP=1.0,
-        SEED=float(CROP_CONFIG[action.crop].seed_cost),
-        LAND=1.0,
-    )
-
-
-def plant_future_gain(action: ActionState, player: RealityState) -> ResourceState:
-    """Deferred MONEY from harvesting + selling the crop's achievable yield,
-    plus PRODUCE units (raw yield count moved into the shed)."""
-    cfg = CROP_CONFIG[action.crop]
-    if cfg.yield_type != "one-time":
-        return ResourceState()
-    yield_units = crop_future_yield(action.crop, player.day)
-    return ResourceState(
-        MONEY=float(yield_units * getattr(player.market.prices, action.crop, 0)),
-        PRODUCE=float(yield_units),
-    )
-
-
-def plant_future_usage(action: ActionState, player: RealityState) -> ResourceState:
-    """Downstream steps the player must spend to realize the future gain:
-    one water per remaining window day, plus one harvest and one sell."""
-    cfg = CROP_CONFIG[action.crop]
-    if cfg.yield_type != "one-time":
-        return ResourceState()
-    waters = crop_window_days_remaining(action.crop, player.day, player.day)
-    return ResourceState(STEP=float(waters + 2))

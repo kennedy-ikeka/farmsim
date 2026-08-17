@@ -1,11 +1,9 @@
 import math
 
 from src.models.crops import CROP_CONFIG
-from src.models.action import WaterActionState, ActionState
+from src.models.action import WaterActionState
 from src.models.farm import PlantState
-from src.models.resource import ResourceState
-from src.models.game import RealityState
-from src.utils.farm import in_bounds, tile_at
+from src.utils.farm import in_bounds
 
 
 def water(state, farm, unit_pos) -> dict:
@@ -74,30 +72,3 @@ def get_valid_water_actions_for(farm, unit_pos) -> list[WaterActionState]:
     if isinstance(tile, PlantState) and not tile.watered_today:
         return [WaterActionState(type="WATER")]
     return []
-
-
-def water_future_gain(action: ActionState, player: RealityState) -> ResourceState:
-    """Deferred MONEY this water adds: +1 yield (or +2 if fertilized) when
-    watered inside the bonus window, valued at the crop's market price."""
-    farm = player.farms[player.player]
-    tile = tile_at(farm, farm.farmer)
-    if not isinstance(tile, PlantState):
-        return ResourceState()
-    cfg = CROP_CONFIG[tile.crop]
-    if cfg.yield_type != "one-time":
-        return ResourceState()
-    dsp = player.day - tile.planted_day
-    window_start = math.ceil(cfg.max_yield_day / 2)
-    window_end = cfg.max_yield_day
-    if not (window_start <= dsp <= window_end):
-        return ResourceState()
-    bonus = 2 if tile.fertilized_until_day >= player.day else 1
-    return ResourceState(
-        MONEY=float(bonus * getattr(player.market.prices, tile.crop, 0)),
-        PRODUCE=float(bonus),
-    )
-
-
-def water_future_usage(action: ActionState, player: RealityState) -> ResourceState:
-    """Downstream steps to realize the gain: one harvest + one sell."""
-    return ResourceState(STEP=2.0)

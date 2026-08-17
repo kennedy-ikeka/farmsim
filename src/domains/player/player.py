@@ -2,6 +2,7 @@ import logging
 import random
 from typing import ClassVar
 
+from src.domains.player.resource import generate_resource_needs
 from src.utils.config import MAX_MARKET_ORDERS_PER_TURN
 from src.domains.farm import Farm
 from src.domains.market import Market
@@ -54,7 +55,8 @@ class Player(RealityState):
             config=PlayerConfig(
                 method=method,
                 resource_needs=resource_needs if resource_needs is not None else ResourceState(
-                    MONEY=1.0, STEP=1.0, SEED=1.0, LAND=1.0, ANIMAL=1.0, HAND=1.0, PRODUCE=1.0,
+                    MONEY=1.0, STEP=1.0, SEED=1.0, LAND=1.0, STRUCTURE=1.0,
+                    ANIMAL=1.0, HAND=1.0, PRODUCE=1.0,
                 ),
             ),
         )
@@ -92,6 +94,17 @@ class Player(RealityState):
         self.private = priv
         return self
 
+    @property
+    def privates(self) -> list:
+        """Single-player view of `privates` — wraps `self.private` as a one-element list.
+
+        Action modules index `state.privates[state.player]` (a `SharedRealityState`
+        shape); `Player` is a single-player view that holds `private` (singular).
+        This property lets the same action modules run against a `Player` sim
+        (used by `apply_action` in scoring) without branching on the state type.
+        """
+        return [self.private]
+
     def random_play(self) -> StepState:
         actions = get_valid_actions(self)
         farmer = random.choice(actions.farmer) if actions.farmer else PassActionState()
@@ -112,9 +125,9 @@ class Player(RealityState):
         re-planning — `Environment.step` executes the chosen actions against
         the real state.
         """
+        self.private.config.resource_needs = generate_resource_needs(self)
         valid = get_valid_actions(self)
         scored = score_valid_actions(valid, self)
-        print(scored)
 
         # Farmer — best action with score > 0, else PASS.
         farmer = (
