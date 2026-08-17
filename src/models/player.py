@@ -2,6 +2,8 @@ from typing_extensions import Literal
 
 from pydantic import BaseModel, Field
 
+from src.models.resource import ResourceWeights
+
 # How a player chooses actions each turn. Lives here (not in game.py) so
 # `PlayerConfig` can carry a per-player `method` without importing game.py
 # (which imports PrivateState — that would be a circular import).
@@ -13,23 +15,6 @@ class ScoreWeights(BaseModel):
     FUTURE_COST: float = Field(1.0, description="Weight for future cost in action scoring.")
     FUTURE_REWARD: float = Field(1.0, description="Weight for future reward in action scoring.")
     FUTURE_DISCOUNT_RATE: float = Field(1.0, description="How much we care about the future")
-
-
-class ResourceWeights(BaseModel):
-    """Per-resource weights used when scoring actions.
-
-    Each weight multiplies the `(usage / available)` term for that resource in
-    the cost and reward scores. Defaults are 1.0 so every resource is valued
-    equally out of the box; override individual fields to bias scoring (e.g.
-    bump `STEP` to penalize turn-spending, or `MONEY` to be thriftier).
-    """
-
-    MONEY: float = Field(1.0, description="Weight for money in action scoring.")
-    STEP: float = Field(1.0, description="Weight for step/turn usage in action scoring.")
-    SEED: float = Field(1.0, description="Weight for seed value in action scoring.")
-    LAND: float = Field(1.0, description="Weight for empty land tiles in action scoring.")
-    ANIMAL: float = Field(1.0, description="Weight for animal value in action scoring.")
-    HAND: float = Field(1.0, description="Weight for hired hands in action scoring.")
 
 
 class PlayerConfig(BaseModel):

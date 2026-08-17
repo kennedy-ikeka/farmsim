@@ -19,6 +19,23 @@ def in_bounds(farm, unit_pos):
     return None
 
 
+def tile_at(farm, pos):
+    """Return the tile at `pos` ([row, col]) or `None` if malformed/out of bounds.
+
+    Shared lookup for resource / future calculations on the unit's current tile
+    (HARVEST, COLLECT_FERTILIZER, WATER, FERTILIZE, FEED, CARE). Mirrors the
+    position guard that opens every farm-action implementation.
+    """
+    if not (isinstance(pos, list) and len(pos) == 2):
+        return None
+    r, c = pos[0], pos[1]
+    rows = len(farm.tiles)
+    cols = len(farm.tiles[0]) if rows else 0
+    if 0 <= r < rows and 0 <= c < cols:
+        return farm.tiles[r][c]
+    return None
+
+
 def is_shed_adjacent(row, col, rows, cols):
     """The shed sits at the board center; the four shed-adjacent tiles are
     (half-1, half-1), (half, half-1), (half-1, half), (half, half) where

@@ -1,8 +1,10 @@
 from src.models.crops import CROP_CONFIG
 from src.models.animals import ANIMAL_CONFIG
-from src.models.action import HarvestActionState
+from src.models.action import HarvestActionState, ActionState
 from src.models.farm import AnimalState, PlantState
-from src.utils.farm import in_bounds
+from src.models.resource import ResourceState
+from src.models.game import RealityState
+from src.utils.farm import in_bounds, tile_at
 
 
 def harvest(state, farm, unit_pos, action: HarvestActionState) -> dict:
@@ -90,3 +92,25 @@ def get_valid_harvest_actions_for(player, unit_pos) -> list[HarvestActionState]:
     if isinstance(tile, AnimalState) and tile.animal is not None and tile.yield_units > 0:
         return [HarvestActionState(type="HARVEST")]
     return []
+
+
+def harvest_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Immediate MONEY from selling the harvestable yield on the farmer's tile
+    (crop or animal product), valued at current market prices, plus PRODUCE
+    units (raw count of product moved into the shed)."""
+    farm = player.farms[player.player]
+    prices = player.market.prices
+    tile = tile_at(farm, farm.farmer)
+    if isinstance(tile, PlantState) and tile.yield_units > 0:
+        return ResourceState(
+            MONEY=float(tile.yield_units * getattr(prices, tile.crop, 0)),
+            PRODUCE=float(tile.yield_units),
+        )
+    if (isinstance(tile, AnimalState) and tile.animal is not None
+            and tile.yield_units > 0):
+        product = ANIMAL_CONFIG[tile.animal].product
+        return ResourceState(
+            MONEY=float(tile.yield_units * getattr(prices, product, 0)),
+            PRODUCE=float(tile.yield_units),
+        )
+    return ResourceState()

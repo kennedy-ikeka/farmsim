@@ -1,7 +1,11 @@
-from src.models.action import PlaceActionState
+from src.models.action import PlaceActionState, ActionState
 from src.models.farm import AnimalState
 from src.models.player import InventoryState
+from src.models.resource import ResourceState
+from src.models.game import RealityState
+from src.models.animals import ANIMAL_CONFIG
 from src.utils.farm import ensure_inventory, is_shed_adjacent, place_animal, in_bounds
+from src.domains.farm.production import animal_future_production, EPISODE_DAYS
 
 
 SHED_CAPACITY = 100
@@ -127,3 +131,35 @@ def get_valid_place_actions_for(player, unit_pos, inv_index) -> list[PlaceAction
                 and not shed_full):
             actions.append(PlaceActionState(type="PLACE", item=item, count=1))
     return actions
+
+
+def place_future_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Deferred MONEY from placing an animal: its full production + fertilizer
+    over the remaining episode under optimal completion. PRODUCE = future
+    product + fertilizer units (raw count). Shed drops gain nothing deferred
+    (their value is realized at SELL)."""
+    if action.item not in ANIMAL_CONFIG:
+        return ResourceState()
+    y, f = animal_future_production(action.item, player.day)
+    product = ANIMAL_CONFIG[action.item].product
+    prices = player.market.prices
+    return ResourceState(
+        MONEY=float(y * getattr(prices, product, 0) + f * getattr(prices, "FERTILIZER", 0)),
+        PRODUCE=float(y + f),
+    )
+
+
+def place_future_usage(action: ActionState, player: RealityState) -> ResourceState:
+    """Downstream spend to realize the future gain: daily feed + daily care +
+    1 harvest + 1 sell + daily collect (steps), plus daily feed wheat (MONEY)
+    and the feed wheat as PRODUCE units consumed. Only counts for animal
+    placement; shed drops have no future spend."""
+    if action.item not in ANIMAL_CONFIG:
+        return ResourceState()
+    remaining_days = max(0, EPISODE_DAYS - player.day)
+    prices = player.market.prices
+    return ResourceState(
+        STEP=float(remaining_days + remaining_days + 1 + 1 + remaining_days),
+        MONEY=float(remaining_days * getattr(prices, "WHEAT", 0)),
+        PRODUCE=float(remaining_days),
+    )

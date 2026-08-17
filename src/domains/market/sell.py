@@ -1,4 +1,6 @@
-from src.models.action import SellActionState
+from src.models.action import SellActionState, ActionState
+from src.models.resource import ResourceState
+from src.models.game import RealityState
 
 
 def sell(state, action: SellActionState) -> dict:
@@ -35,3 +37,18 @@ def get_valid_sell_actions(player) -> list[SellActionState]:
         for item in type(prices).model_fields
         if getattr(shed, item, 0) > 0 and getattr(prices, item, 0) > 0
     ]
+
+
+def sell_resource_usage(action: ActionState, player: RealityState) -> ResourceState:
+    """SELL consumes `count` of `item` from the shed (PRODUCE units) and one step."""
+    return ResourceState(
+        STEP=1.0,
+        PRODUCE=float(action.count),
+    )
+
+
+def sell_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Immediate MONEY from selling `count` of `item` at the current market price."""
+    return ResourceState(
+        MONEY=float(action.count * getattr(player.market.prices, action.item, 0))
+    )

@@ -1,6 +1,8 @@
 from typing import get_args
 
-from src.models.action import BuyProductActionState
+from src.models.action import BuyProductActionState, ActionState
+from src.models.resource import ResourceState
+from src.models.game import RealityState
 from src.models.objects import BUYABLE_PRODUCTS
 
 
@@ -51,3 +53,20 @@ def get_valid_buy_product_actions(player) -> list[BuyProductActionState]:
         if price > 0 and available > 0 and farm.money >= price:
             actions.append(BuyProductActionState(type="BUY_PRODUCT", item=item, count=1))
     return actions
+
+
+def buy_product_resource_usage(action: ActionState, player: RealityState) -> ResourceState:
+    """BUY_PRODUCT costs `count * price[item]` MONEY and one step."""
+    return ResourceState(
+        STEP=1.0,
+        MONEY=float(action.count * getattr(player.market.prices, action.item, 0)),
+    )
+
+
+def buy_product_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Immediate MONEY value of the bought product (count * price), held in
+    shed, plus PRODUCE units (raw count of product added to the shed)."""
+    return ResourceState(
+        MONEY=float(action.count * getattr(player.market.prices, action.item, 0)),
+        PRODUCE=float(action.count),
+    )

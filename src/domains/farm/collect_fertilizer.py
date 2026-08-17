@@ -1,6 +1,8 @@
 from src.models.farm import AnimalState
-from src.models.action import CollectFertilizerActionState
-from src.utils.farm import in_bounds
+from src.models.action import CollectFertilizerActionState, ActionState
+from src.models.resource import ResourceState
+from src.models.game import RealityState
+from src.utils.farm import in_bounds, tile_at
 
 
 def collect_fertilizer(state, farm, unit_pos, action) -> dict:
@@ -56,3 +58,17 @@ def get_valid_collect_fertilizer_actions_for(farm, unit_pos) -> list[CollectFert
     if tile.fertilizer_available <= 0:
         return []
     return [CollectFertilizerActionState(type="COLLECT_FERTILIZER")]
+
+
+def collect_fertilizer_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Immediate MONEY from the one fertilizer a housed animal makes available
+    each day, valued at the fertilizer market price, plus 1 PRODUCE unit."""
+    farm = player.farms[player.player]
+    tile = tile_at(farm, farm.farmer)
+    if (isinstance(tile, AnimalState) and tile.animal is not None
+            and tile.fertilizer_available > 0):
+        return ResourceState(
+            MONEY=float(getattr(player.market.prices, "FERTILIZER", 0)),
+            PRODUCE=1.0,
+        )
+    return ResourceState()

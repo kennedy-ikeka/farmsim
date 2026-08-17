@@ -1,4 +1,6 @@
-from src.models.action import HireActionState
+from src.models.action import HireActionState, ActionState
+from src.models.resource import ResourceState
+from src.models.game import RealityState
 
 
 # Default multiplier applied to the Fibonacci hire-cost sequence.
@@ -78,3 +80,17 @@ def get_valid_hire_actions(player) -> list[HireActionState]:
     if farm.money < cost:
         return []
     return [HireActionState(type="HIRE")]
+
+
+def hire_resource_usage(action: ActionState, player: RealityState) -> ResourceState:
+    """HIRE costs `FARM_HAND_COST_MULT * fib(hires_today)` MONEY and one step."""
+    farm = player.farms[player.player]
+    return ResourceState(
+        STEP=1.0,
+        MONEY=float(FARM_HAND_COST_MULT * _fib(farm.hires_today)),
+    )
+
+
+def hire_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Immediate HAND gained (one farm hand)."""
+    return ResourceState(HAND=1.0)

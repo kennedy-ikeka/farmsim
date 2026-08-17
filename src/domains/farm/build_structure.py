@@ -1,6 +1,10 @@
 from src.models.farm import AnimalState
-from src.models.action import BuildCoopActionState, BuildPastureActionState
+from src.models.action import BuildCoopActionState, BuildPastureActionState, ActionState
+from src.models.resource import ResourceState
+from src.models.game import RealityState
+from src.models.animals import ANIMAL_CONFIG
 from src.utils.farm import in_bounds
+from src.domains.farm.production import animal_future_production, EPISODE_DAYS
 
 
 def build_structure(farm, unit_pos, action) -> dict:
@@ -42,3 +46,47 @@ def get_valid_build_actions_for(farm, unit_pos) -> list:
     if farm.tiles[row][col] is not None:
         return []
     return [BuildCoopActionState(type="BUILD_COOP"), BuildPastureActionState(type="BUILD_PASTURE")]
+
+
+def build_structure_resource_usage(action: ActionState, player: RealityState) -> ResourceState:
+    """BUILD_COOP / BUILD_PASTURE consume one empty tile and one step."""
+    return ResourceState(STEP=1.0, LAND=1.0)
+
+
+def build_structure_future_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Deferred MONEY from the animal the structure will house under optimal
+    completion: BUILD_COOP → goose production; BUILD_PASTURE → the better of
+    COW vs SHEEP by gross production value. PRODUCE = future product +
+    fertilizer units (raw count of sellable goods produced)."""
+    prices = player.market.prices
+    day = player.day
+    if action.type == "BUILD_COOP":
+        y, f = animal_future_production("GOOSE", day)
+        return ResourceState(
+            MONEY=float(y * getattr(prices, "EGG", 0) + f * getattr(prices, "FERTILIZER", 0)),
+            PRODUCE=float(y + f),
+        )
+    # BUILD_PASTURE — pick the better of COW vs SHEEP.
+    best = 0.0
+    best_produce = 0.0
+    for animal in ("COW", "SHEEP"):
+        y, f = animal_future_production(animal, day)
+        product = ANIMAL_CONFIG[animal].product
+        value = y * getattr(prices, product, 0) + f * getattr(prices, "FERTILIZER", 0)
+        if value > best:
+            best = value
+            best_produce = y + f
+    return ResourceState(MONEY=float(best), PRODUCE=float(best_produce))
+
+
+def build_structure_future_usage(action: ActionState, player: RealityState) -> ResourceState:
+    """Downstream spend to realize the future gain: place + daily feed + daily
+    care + 1 harvest + 1 sell + daily collect (steps), plus daily feed wheat
+    (MONEY) and the feed wheat as PRODUCE units consumed from the shed."""
+    remaining_days = max(0, EPISODE_DAYS - player.day)
+    prices = player.market.prices
+    return ResourceState(
+        STEP=float(1 + remaining_days + remaining_days + 1 + 1 + remaining_days),
+        MONEY=float(remaining_days * getattr(prices, "WHEAT", 0)),
+        PRODUCE=float(remaining_days),
+    )

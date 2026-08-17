@@ -8,10 +8,11 @@ from src.models.environment import ValidStepsState
 class ScoredActionState(BaseModel):
     """A valid action paired with its scoring breakdown."""
     action: ActionState = Field(description="The action being scored.")
-    score: float = Field(0.0, description="Final score = reward - (cost + risk) / 2.")
-    cost_score: float = Field(0.0, description="Resources consumed by this action.")
-    reward_score: float = Field(0.0, description="Resources gained by this action.")
-    future_cost_score: float = Field(0.0, description="Probability-weighted risk of action not bearing fruit.")
+    score: float = Field(0.0, description="(reward - cost) + (future_reward - future_cost) * FUTURE_DISCOUNT_RATE.")
+    cost_score: float = Field(0.0, description="Immediate resources consumed by this action.")
+    reward_score: float = Field(0.0, description="Immediate resources gained by this action.")
+    future_cost_score: float = Field(0.0, description="Future resources spent to realize the deferred payoff.")
+    future_reward_score: float = Field(0.0, description="Deferred resources this action enables (realized downstream).")
 
 
 class ScoredValidStepsState(BaseModel):
