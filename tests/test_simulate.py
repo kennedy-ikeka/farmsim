@@ -118,7 +118,7 @@ class TestSimulate:
             captured.append({
                 "player": kwargs.get("player"),
                 "method": priv.config.method,
-                "weights": priv.config.resource_weights,
+                "weights": priv.config.resource_weights.model_copy(),
             })
             return real_init(self, *args, **kwargs)
 

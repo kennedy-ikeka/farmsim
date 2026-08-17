@@ -60,7 +60,6 @@ class StepState(BaseModel):
             "hands": [h.to_list() for h in self.hands],
             "market": [m.to_list() for m in self.market],
         }
-        print(step)
         return step
 
 

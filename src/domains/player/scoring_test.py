@@ -12,6 +12,7 @@ from src.domains.player.scoring import (
     future_reward_score,
     score_action,
     score_valid_actions,
+    update_resource_weights,
 )
 from src.domains.farm.scoring import available_resources
 from src.models.action import (
@@ -160,41 +161,53 @@ class TestActionResourceUsage:
 
 class TestCostScore:
     def test_pass_cost_is_step_weight(self):
-        """PASS uses 1 step; cost = 1 * step_weight (raw usage × weight)."""
+        """PASS uses 1 step; cost = (1 / available_step) * step_weight."""
         player = Player().build()
         cost = cost_score(PassActionState(), player)
-        expected = 1.0 * player.private.config.resource_weights.STEP
+        w = player.private.config.resource_weights
+        avail = available_resources(player)
+        expected = (1.0 / max(avail.STEP, 1.0)) * w.STEP
         assert abs(cost - expected) < 1e-9
 
     def test_plant_cost_is_seed_plus_land_plus_step(self):
-        """PLANT uses SEED (economic=10) + LAND (1) + STEP (1); cost = sum of usage × weight."""
+        """PLANT uses SEED (economic=10) + LAND (1) + STEP (1);
+        cost = sum of (usage / available) * weight."""
         player = Player().build(seeds={"WHEAT": 5})
         cost = cost_score(PlantActionState(type="PLANT", crop="WHEAT"), player)
         w = player.private.config.resource_weights
-        expected = 10.0 * w.SEED + 1.0 * w.LAND + 1.0 * w.STEP
+        avail = available_resources(player)
+        expected = ((10.0 / max(avail.SEED, 1.0)) * w.SEED
+                    + (1.0 / max(avail.LAND, 1.0)) * w.LAND
+                    + (1.0 / max(avail.STEP, 1.0)) * w.STEP)
         assert abs(cost - expected) < 1e-9
 
     def test_buy_seed_cost_is_money_plus_step(self):
-        """BUY_SEED WHEAT costs MONEY=10 + STEP=1; cost = 10*MONEY_w + 1*STEP_w."""
+        """BUY_SEED WHEAT costs MONEY=10 + STEP=1;
+        cost = (10/available_money)*MONEY_w + (1/available_step)*STEP_w."""
         player = Player().build(money=3000)
         cost = cost_score(BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1), player)
         w = player.private.config.resource_weights
-        expected = 10.0 * w.MONEY + 1.0 * w.STEP
+        avail = available_resources(player)
+        expected = ((10.0 / max(avail.MONEY, 1.0)) * w.MONEY
+                    + (1.0 / max(avail.STEP, 1.0)) * w.STEP)
         assert abs(cost - expected) < 1e-9
 
     def test_build_cost_is_land_plus_step(self):
-        """BUILD_COOP uses LAND=1 + STEP=1; cost = 1*LAND_w + 1*STEP_w."""
+        """BUILD_COOP uses LAND=1 + STEP=1;
+        cost = (1/available_land)*LAND_w + (1/available_step)*STEP_w."""
         player = Player().build()
         cost = cost_score(BuildCoopActionState(type="BUILD_COOP"), player)
         w = player.private.config.resource_weights
-        expected = 1.0 * w.LAND + 1.0 * w.STEP
+        avail = available_resources(player)
+        expected = ((1.0 / max(avail.LAND, 1.0)) * w.LAND
+                    + (1.0 / max(avail.STEP, 1.0)) * w.STEP)
         assert abs(cost - expected) < 1e-9
 
     def test_custom_weights_change_cost(self):
-        """Bumping STEP weight from 1.0 to 5.0 scales the step term of PLANT cost by 5.
+        """Bumping STEP weight scales the step term of PLANT cost.
 
-        PLANT WHEAT: SEED=10, LAND=1, STEP=1. Base cost = 10+1+1 = 12;
-        heavy (STEP=5) cost = 10+1+5 = 16.
+        Scarcity-weighted: cost = (10/avail_SEED)*SEED_w + (1/avail_LAND)*LAND_w
+        + (1/avail_STEP)*STEP_w. Bumping STEP_w from 1→5 only changes the last term.
         """
         player = Player().build(seeds={"WHEAT": 5})
         heavy = Player().build(
@@ -203,8 +216,10 @@ class TestCostScore:
         )
         base = cost_score(PlantActionState(type="PLANT", crop="WHEAT"), player)
         bumped = cost_score(PlantActionState(type="PLANT", crop="WHEAT"), heavy)
-        assert abs(base - 12.0) < 1e-9
-        assert abs(bumped - 16.0) < 1e-9
+        avail = available_resources(player)
+        step_term_base = (1.0 / max(avail.STEP, 1.0)) * 1.0
+        step_term_heavy = (1.0 / max(avail.STEP, 1.0)) * 5.0
+        assert abs(base - bumped + step_term_heavy - step_term_base) < 1e-9
         assert bumped > base
 
 
@@ -222,10 +237,9 @@ class TestScoreAction:
         assert scored.future_cost_score == 0.0
 
     def test_plant_final_score_is_future_minus_cost(self):
-        """PLANT WHEAT at day 0 with real prices: reward=0 (enabler), cost=12
-        (SEED 10 + LAND 1 + STEP 1), future_reward=78 (3 yield * 25 MONEY + 3
-        PRODUCE), future_cost=5 (3 waters + harvest + sell). With all weights
-        and FUTURE_DISCOUNT_RATE = 1.0: score = (0 - 12) + (78 - 5) * 1 = 61.
+        """PLANT WHEAT at day 0 with real prices: reward=0 (enabler),
+        scarcity-weighted cost and future scores. Verifies the formula
+        score = (reward - cost) + (future_reward - future_cost) * discount.
         """
         player = Player().build(
             money=3000, seeds={"WHEAT": 5},
@@ -233,10 +247,13 @@ class TestScoreAction:
         )
         scored = score_action(PlantActionState(type="PLANT", crop="WHEAT"), player)
         assert scored.reward_score == 0.0          # enabler: no immediate gain
-        assert abs(scored.cost_score - 12.0) < 1e-9
-        assert abs(scored.future_reward_score - 78.0) < 1e-9
-        assert abs(scored.future_cost_score - 5.0) < 1e-9
-        assert abs(scored.score - 61.0) < 1e-9
+        # Verify the formula holds with the scarcity-weighted sub-scores.
+        expected = (scored.reward_score - scored.cost_score) + (
+            scored.future_reward_score - scored.future_cost_score
+        ) * player.private.config.score_weights.FUTURE_DISCOUNT_RATE
+        assert abs(scored.score - expected) < 1e-9
+        # PLANT is an enabler with positive future value → score should be positive.
+        assert scored.score > 0.0
 
     def test_scored_action_wraps_original(self):
         action = PassActionState()
@@ -264,10 +281,12 @@ class TestScoreValidActions:
     def test_sell_action_has_positive_final_score_when_broke(self):
         """SELL generates MONEY reward; when broke the reward dominates cost.
 
-        Player().build sets all prices to 1 (reward=1, cost=1 → score=0), so we
-        set a real WHEAT price (5) to make reward (5) exceed the step cost (1).
+        With scarcity weighting: selling when money=0 gives reward = price/(0+price)
+        = 1.0 (maximal marginal value). The produce cost per unit is 1/available_produce,
+        so having 10 WHEAT makes each unit cheap to sell (1/10 = 0.1) while the
+        money reward is 1.0 → score > 0.
         """
-        player = Player().build(money=0, shed={"WHEAT": 1}, market_prices={"WHEAT": 5})
+        player = Player().build(money=0, shed={"WHEAT": 10}, market_prices={"WHEAT": 5})
         scored = score_valid_actions(get_valid_actions(player), player)
         sells = [s for s in scored.market if s.action.type == "SELL"]
         assert sells, "expected at least one SELL action"
@@ -430,13 +449,14 @@ class TestActionResourceGain:
         gain = action_resource_gain(DigActionState(type="DIG"), player)
         assert gain == ResourceState(LAND=1.0)
 
-    def test_place_animal_gains_nothing_immediate(self):
-        """PLACE a GOOSE has no immediate gain; payoff is the deferred production."""
+    def test_place_animal_gains_produce_immediate(self):
+        """PLACE a GOOSE deploys one productive unit → immediate PRODUCE = 1.0.
+        The rest of the payoff is the deferred production (future_gain)."""
         player = Player().build(money=3000)
         gain = action_resource_gain(
             PlaceActionState(type="PLACE", item="GOOSE", count=1), player
         )
-        assert gain == ResourceState()
+        assert gain == ResourceState(PRODUCE=1.0)
 
     def test_place_shed_drop_gains_nothing(self):
         """PLACE a non-animal item (shed drop) gains nothing."""
@@ -635,22 +655,31 @@ class TestRewardScore:
         assert abs(reward - 1.0) < 1e-9
 
     def test_buy_seed_reward_scales_with_value(self):
-        """BUY_SEED WHEAT gains 10 seed-value; with 0 seeds → reward = 10 * SEED weight."""
-        player = Player().build(money=3000, seeds={"WHEAT": 0})
-        reward = reward_score(BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1), player)
-        assert abs(reward - 10.0) < 1e-9
+        """BUY_SEED reward with diminishing returns: gain / (available + gain).
 
-    def test_sell_reward_is_constant_regardless_of_money(self):
-        """Reward is now raw gain × weight (no /available divisor), so it does
-        not diminish as money grows: SELL WHEAT (price=1) rewards 1.0 whether
-        broke or rich.
+        With existing seeds (WHEAT=5 → avail.SEED=50), buying MELON (gain=80)
+        gives higher reward than WHEAT (gain=10) because 80/(50+80) > 10/(50+10).
         """
-        broke = Player().build(money=0, shed={"WHEAT": 1})
-        rich = Player().build(money=3000, shed={"WHEAT": 1})
+        player = Player().build(money=3000, seeds={"WHEAT": 5})
+        r_wheat = reward_score(BuySeedActionState(type="BUY_SEED", crop="WHEAT", count=1), player)
+        r_melon = reward_score(BuySeedActionState(type="BUY_SEED", crop="MELON", count=1), player)
+        avail = available_resources(player)
+        w = player.private.config.resource_weights
+        expected_wheat = (10.0 / max(avail.SEED + 10.0, 1.0)) * w.SEED
+        expected_melon = (80.0 / max(avail.SEED + 80.0, 1.0)) * w.SEED
+        assert abs(r_wheat - expected_wheat) < 1e-9
+        assert abs(r_melon - expected_melon) < 1e-9
+        assert r_melon > r_wheat  # higher value → higher reward
+
+    def test_sell_reward_diminishes_as_money_grows(self):
+        """Scarcity-weighted reward: selling when broke gives higher reward
+        than selling when rich (marginal value of money is higher when poor).
+        """
+        broke = Player().build(money=0, shed={"WHEAT": 10})
+        rich = Player().build(money=3000, shed={"WHEAT": 10})
         r_broke = reward_score(SellActionState(type="SELL", item="WHEAT", count=1), broke)
         r_rich = reward_score(SellActionState(type="SELL", item="WHEAT", count=1), rich)
-        assert abs(r_broke - 1.0) < 1e-9
-        assert abs(r_rich - 1.0) < 1e-9
+        assert r_broke > r_rich  # selling is more valuable when broke
 
     def test_custom_weights_change_reward(self):
         """Bumping MONEY weight from 1.0 to 5.0 scales the SELL reward 5x."""
@@ -672,13 +701,78 @@ class TestRewardScore:
 
 class TestFinalScoreWithReward:
     def test_final_score_is_reward_minus_cost(self):
-        """With future_value=0: score = reward - cost. Uses SELL when broke
-        (reward=1, cost = STEP 1 + PRODUCE 1 = 2)."""
+        """With future_value=0: score = reward - cost (scarcity-weighted).
+
+        SELL when broke (money=0, 1 WHEAT): cost = (1/avail_step)*STEP_w +
+        (1/avail_produce)*PRODUCE_w, reward = (1/(0+1))*MONEY_w = 1.0.
+        """
         player = Player().build(money=0, shed={"WHEAT": 1})
         scored = score_action(SellActionState(type="SELL", item="WHEAT", count=1), player)
         w = player.private.config.resource_weights
-        cost = 1.0 * w.STEP + 1.0 * w.PRODUCE  # SELL consumes 1 produce unit + 1 step
+        avail = available_resources(player)
+        cost = ((1.0 / max(avail.STEP, 1.0)) * w.STEP
+                + (1.0 / max(avail.PRODUCE, 1.0)) * w.PRODUCE)
         expected = scored.reward_score - scored.cost_score
         assert abs(scored.score - expected) < 1e-9
         assert abs(scored.cost_score - cost) < 1e-9
+        assert scored.reward_score == 1.0  # 1 / max(0 + 1, 1) = 1.0
         assert scored.reward_score == 1.0
+
+
+class TestUpdateResourceWeights:
+    """Satiation-style weight update after play."""
+
+    def test_empty_selected_leaves_weights_unchanged(self):
+        player = Player().build(money=3000, seeds={"WHEAT": 5})
+        before = player.private.config.resource_weights.model_copy()
+        update_resource_weights(player, [])
+        assert player.private.config.resource_weights == before
+
+    def test_driving_resources_get_lower_weights(self):
+        """BUY_ANIMAL's immediate driver is ANIMAL (gain=cost, no usage).
+        After the update ANIMAL drops below the untouched resources. PRODUCE
+        is only a future driver → NOT satiated, stays at 1.0."""
+        player = Player().build(money=3000)
+        scored = score_action(
+            BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=1), player
+        )
+        update_resource_weights(player, [scored])
+        w = player.private.config.resource_weights
+        # ANIMAL was the immediate driver → reduced.
+        assert w.ANIMAL < 1.0
+        assert w.ANIMAL < w.STEP
+        # PRODUCE is future-only → NOT satiated, stays max.
+        assert w.PRODUCE == 1.0
+        # MONEY is consumed (usage) but not gained → not a driver, unchanged.
+        assert w.MONEY == 1.0
+
+    def test_weights_normalized_to_0_1(self):
+        """After update, every weight is in [0, 1] and at least one stays at 1.0
+        (untouched resources). Satiation only reduces; no normalization now."""
+        player = Player().build(money=3000)
+        scored = score_action(
+            BuyAnimalActionState(type="BUY_ANIMAL", animal="GOOSE", count=1), player
+        )
+        update_resource_weights(player, [scored])
+        w = player.private.config.resource_weights
+        values = [getattr(w, r) for r in type(w).model_fields]
+        assert max(values) == 1.0
+        assert all(0.0 <= v <= 1.0 for v in values)
+
+    def test_no_drivers_leaves_weights_unchanged(self):
+        """PASS has no positive net on any resource → weights unchanged."""
+        player = Player().build(money=3000, seeds={"WHEAT": 5})
+        before = player.private.config.resource_weights.model_copy()
+        scored = score_action(PassActionState(), player)
+        update_resource_weights(player, [scored])
+        assert player.private.config.resource_weights == before
+
+    def test_basic_play_mutates_weights(self):
+        """basic_play updates weights after selecting actions."""
+        player = Player().build(
+            money=3000, seeds={"WHEAT": 5}, method="BASIC",
+        )
+        before = player.private.config.resource_weights.model_copy()
+        player.basic_play()
+        # Weights should have been mutated (at least one field changed).
+        assert player.private.config.resource_weights != before

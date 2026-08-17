@@ -38,6 +38,14 @@ class PlayerConfig(BaseModel):
         default_factory=ScoreWeights,
         description="Per-score weights for this player."
     )
+    weight_learning_rate: float = Field(
+        0.1,
+        description=(
+            "Satiation rate for resource-weight updates after each play. "
+            "Resources that drove the chosen action have their weight reduced "
+            "by `lr * share_of_positive_net`; weights are then normalized to [0, 1]."
+        )
+    )
 
 
 class ShedState(BaseModel):

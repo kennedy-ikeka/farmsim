@@ -133,6 +133,15 @@ def get_valid_place_actions_for(player, unit_pos, inv_index) -> list[PlaceAction
     return actions
 
 
+def place_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Immediate PRODUCE gain from placing an animal on a structure — one
+    deployment creates one productive unit. Shed drops gain nothing
+    immediately (their value is realized at SELL)."""
+    if action.item in ANIMAL_CONFIG:
+        return ResourceState(PRODUCE=1.0)
+    return ResourceState()
+
+
 def place_future_gain(action: ActionState, player: RealityState) -> ResourceState:
     """Deferred MONEY from placing an animal: its full production + fertilizer
     over the remaining episode under optimal completion. PRODUCE = future

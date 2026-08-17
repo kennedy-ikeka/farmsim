@@ -53,6 +53,19 @@ def build_structure_resource_usage(action: ActionState, player: RealityState) ->
     return ResourceState(STEP=1.0, LAND=1.0)
 
 
+def build_structure_resource_gain(action: ActionState, player: RealityState) -> ResourceState:
+    """Immediate PRODUCE gain = count of unplaced animals of the matching kind
+    in the shed. BUILD_COOP → shed.GOOSE; BUILD_PASTURE → shed.COW +
+    shed.SHEEP. Building with no matching animals in the shed gains nothing
+    (the structure is idle until animals are bought and placed)."""
+    shed = player.private.shed
+    if action.type == "BUILD_COOP":
+        return ResourceState(PRODUCE=float(getattr(shed, "GOOSE", 0)))
+    if action.type == "BUILD_PASTURE":
+        return ResourceState(PRODUCE=float(getattr(shed, "COW", 0) + getattr(shed, "SHEEP", 0)))
+    return ResourceState()
+
+
 def build_structure_future_gain(action: ActionState, player: RealityState) -> ResourceState:
     """Deferred MONEY from the animal the structure will house under optimal
     completion: BUILD_COOP → goose production; BUILD_PASTURE → the better of

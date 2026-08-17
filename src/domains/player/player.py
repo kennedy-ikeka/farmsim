@@ -6,12 +6,16 @@ from src.utils.config import MAX_MARKET_ORDERS_PER_TURN
 from src.domains.farm import Farm
 from src.domains.market import Market
 from src.models.action import PassActionState
-from src.models.game import RealityState
+from src.models.game import RealityState, SharedRealityState
 from src.models.environment import StepState
 from src.models.player import PlayerConfig, ShedState, SeedsState, PrivateState, ResourceWeights
 from src.models.market import MarketInventory, MarketPrices
 from src.domains.player.valid_actions import get_valid_actions
-from src.domains.player.scoring import score_valid_actions
+from src.domains.player.scoring import (
+    score_valid_actions,
+    score_action,
+    update_resource_weights,
+)
 from src.utils.logger import get_logger
 
 
@@ -100,61 +104,95 @@ class Player(RealityState):
         return step
 
     def basic_play(self) -> StepState:
-        """Select highest-scoring valid action for each slot, but only when it
-        beats PASS.
+        """Shared scoring-based selection for BASIC / TACTICAL.
 
-        Farmer and each hand take their single highest-scored action, but only
-        if that action's score is strictly positive (PASS scores ≈ 0 since it
-        gains nothing); otherwise the slot falls back to PASS. Market takes the
-        top `MAX_MARKET_ORDERS_PER_TURN` highest-scored market actions *with
-        positive score* — net-negative buys are not dispatched, so the agent no
-        longer drains its bank on animals/land/hands it can't use. Empty slots
-        fall back to PASS.
+        Each action is picked by scoring valid actions, then SIMULATED on a
+        deep copy of the state before re-planning the next. This means:
+
+        - After buying an animal (money drops), the next buy is re-scored
+          against the reduced bank balance — unaffordable buys vanish from
+          valid actions and scarcity rises on the rest.
+        - After planting on a tile, the next hand sees that tile occupied.
+        - Weights satiate after each pick so the resource that drove one
+          action is less influential for the next.
+
+        The simulation copy is discarded after selection; the real state is
+        left clean for `Environment.step` to execute the chosen actions.
+        Only the satiated weights are written back to the real player.
         """
-        scored = score_valid_actions(get_valid_actions(self), self)
-        best_farmer = max(scored.farmer, key=lambda s: s.score) if scored.farmer else None
-        farmer = best_farmer.action if best_farmer and best_farmer.score > 0 else PassActionState()
+        # --- Build a simulation copy with Farm/Market controllers ----------
+        sim = self.model_copy(deep=True)
+        sim.farms = [
+            f if isinstance(f, Farm) else Farm(**f.model_dump())
+            for f in sim.farms
+        ]
+        if not isinstance(sim.market, Market):
+            sim.market = Market(**sim.market.model_dump())
+        # SharedRealityState view over the same refs — action execution
+        # functions read `state.privates[state.player]`, not `state.private`.
+        # Place sim.private at index sim.player so the lookup resolves for
+        # any player id (other slots are dummies — only the active player's
+        # state is mutated during simulation).
+        privates = [PrivateState() for _ in range(sim.player)]
+        privates.append(sim.private)
+        sim_shared = SharedRealityState(
+            remainingOverageTime=sim.remainingOverageTime,
+            step=sim.step, day=sim.day, hour=sim.hour, player=sim.player,
+            farms=sim.farms, market=sim.market, town=sim.town,
+            privates=privates,
+        )
 
+        # --- Farmer --------------------------------------------------------
+        valid = get_valid_actions(sim)
+        farmer_scored = [score_action(a, sim) for a in valid.farmer]
+        best_farmer = max(farmer_scored, key=lambda s: s.score) if farmer_scored else None
+        if best_farmer and best_farmer.score > 0:
+            farmer = best_farmer.action
+            sim.farms[sim.player].apply(
+                sim_shared, sim.farms[sim.player].farmer, best_farmer.action, 0
+            )
+            update_resource_weights(sim, [best_farmer])
+        else:
+            farmer = PassActionState()
+
+        # --- Hands (re-plan from simulated state after each pick) ----------
         hands = []
-        for hand in scored.hands:
-            best = max(hand, key=lambda s: s.score) if hand else None
-            hands.append(best.action if best and best.score > 0 else PassActionState())
+        num_hands = len(sim.farms[sim.player].hands)
+        for hand_idx in range(num_hands):
+            valid = get_valid_actions(sim)
+            hand_actions = valid.hands[hand_idx] if hand_idx < len(valid.hands) else []
+            hand_scored = [score_action(a, sim) for a in hand_actions]
+            best = max(hand_scored, key=lambda s: s.score) if hand_scored else None
+            if best and best.score > 0:
+                hands.append(best.action)
+                sim.farms[sim.player].apply(
+                    sim_shared,
+                    sim.farms[sim.player].hands[hand_idx],
+                    best.action, hand_idx + 1,
+                )
+                update_resource_weights(sim, [best])
+            else:
+                hands.append(PassActionState())
 
-        positive_market = [s for s in scored.market if s.score > 0]
-        top_market = sorted(positive_market, key=lambda s: s.score, reverse=True)[:MAX_MARKET_ORDERS_PER_TURN]
-        market = [s.action for s in top_market]
+        # --- Market (greedy: pick, simulate, re-plan, repeat) --------------
+        market = []
+        for _ in range(MAX_MARKET_ORDERS_PER_TURN):
+            valid = get_valid_actions(sim)
+            if not valid.market:
+                break
+            scored = [score_action(a, sim) for a in valid.market]
+            best = max(scored, key=lambda s: s.score)
+            if best.score <= 0:
+                break
+            market.append(best.action)
+            sim.market.apply(sim_shared, best.action)
+            update_resource_weights(sim, [best])
+
+        # --- Persist satiated weights to the real player -------------------
+        self.private.config.resource_weights = sim.private.config.resource_weights
 
         step = StepState(farmer=farmer, hands=hands, market=market)
-        self.logger.info("basic_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
-        return step
-
-    def tactical_play(self) -> StepState:
-        """Select highest-scoring valid action for each slot, but only when it
-        beats PASS.
-
-        Farmer and each hand take their single highest-scored action, but only
-        if that action's score is strictly positive (PASS scores ≈ 0 since it
-        gains nothing); otherwise the slot falls back to PASS. Market takes the
-        top `MAX_MARKET_ORDERS_PER_TURN` highest-scored market actions *with
-        positive score* — net-negative buys are not dispatched, so the agent no
-        longer drains its bank on animals/land/hands it can't use. Empty slots
-        fall back to PASS.
-        """
-        scored = score_valid_actions(get_valid_actions(self), self)
-        best_farmer = max(scored.farmer, key=lambda s: s.score) if scored.farmer else None
-        farmer = best_farmer.action if best_farmer and best_farmer.score > 0 else PassActionState()
-
-        hands = []
-        for hand in scored.hands:
-            best = max(hand, key=lambda s: s.score) if hand else None
-            hands.append(best.action if best and best.score > 0 else PassActionState())
-
-        positive_market = [s for s in scored.market if s.score > 0]
-        top_market = sorted(positive_market, key=lambda s: s.score, reverse=True)[:MAX_MARKET_ORDERS_PER_TURN]
-        market = [s.action for s in top_market]
-
-        step = StepState(farmer=farmer, hands=hands, market=market)
-        self.logger.info("basic_play: player=%s farmer=%s hands=%s market=%s", self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
+        self.logger.info("%s: player=%s farmer=%s hands=%s market=%s", 'basic_play', self.player, farmer.type, [h.type for h in hands], [m.type for m in market])
         return step
 
     def play(self) -> StepState:

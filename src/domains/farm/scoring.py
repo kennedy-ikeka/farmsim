@@ -31,13 +31,15 @@ from .fertilize import (fertilize_resource_usage as fertilize_usage,
 from .harvest import harvest_resource_gain as harvest_gain
 from .collect_fertilizer import collect_fertilizer_resource_gain as collect_fertilizer_gain
 from .build_structure import (build_structure_resource_usage as build_usage,
+                              build_structure_resource_gain as build_gain,
                               build_structure_future_gain as build_fg,
                               build_structure_future_usage as build_fu)
 from .feed import (feed_resource_usage as feed_usage,
                    feed_future_gain as feed_fg, feed_future_usage as feed_fu)
 from .care import care_future_gain as care_fg, care_future_usage as care_fu
 from .dig import dig_resource_gain as dig_gain
-from .place import place_future_gain as place_fg, place_future_usage as place_fu
+from .place import (place_resource_gain as place_gain,
+                    place_future_gain as place_fg, place_future_usage as place_fu)
 
 _USAGE = {
     "PLANT": plant_usage,
@@ -50,6 +52,9 @@ _GAIN = {
     "HARVEST": harvest_gain,
     "COLLECT_FERTILIZER": collect_fertilizer_gain,
     "DIG": dig_gain,
+    "PLACE": place_gain,
+    "BUILD_COOP": build_gain,
+    "BUILD_PASTURE": build_gain,
 }
 _FGAIN = {
     "PLANT": plant_fg,
