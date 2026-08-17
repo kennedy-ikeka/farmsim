@@ -1,7 +1,12 @@
-from src.models.action import PlaceActionState
+from src.models.game import RealityState
+from src.models.action import (
+    ActionState, PlaceActionState, SellActionState,
+)
 from src.models.farm import AnimalState
 from src.models.player import InventoryState
+from src.models.animals import ANIMAL_CONFIG
 from src.utils.farm import ensure_inventory, is_shed_adjacent, place_animal, in_bounds
+from src.domains.farm.production import animal_pipeline
 
 
 SHED_CAPACITY = 100
@@ -127,3 +132,14 @@ def get_valid_place_actions_for(player, unit_pos, inv_index) -> list[PlaceAction
                 and not shed_full):
             actions.append(PlaceActionState(type="PLACE", item=item, count=1))
     return actions
+
+
+def get_place_pipeline(action: PlaceActionState, player: RealityState,
+                       unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following a PLACE: an animal placement starts the animal's
+    per-day care + harvest + sell tail; a shed drop is realized by SELLING the
+    dropped item.
+    """
+    if action.item in ANIMAL_CONFIG:
+        return animal_pipeline(action.item, player.day)
+    return [SellActionState(type="SELL", item=action.item, count=action.count)]

@@ -1,8 +1,11 @@
+from src.models.game import RealityState
 from src.models.crops import CROP_CONFIG
 from src.models.animals import ANIMAL_CONFIG
-from src.models.action import HarvestActionState
+from src.models.action import (
+    ActionState, HarvestActionState, SellActionState,
+)
 from src.models.farm import AnimalState, PlantState
-from src.utils.farm import in_bounds
+from src.utils.farm import in_bounds, tile_at
 
 
 def harvest(state, farm, unit_pos, action: HarvestActionState) -> dict:
@@ -89,4 +92,19 @@ def get_valid_harvest_actions_for(player, unit_pos) -> list[HarvestActionState]:
         return [HarvestActionState(type="HARVEST")]
     if isinstance(tile, AnimalState) and tile.animal is not None and tile.yield_units > 0:
         return [HarvestActionState(type="HARVEST")]
+    return []
+
+
+def get_harvest_pipeline(action: HarvestActionState, player: RealityState,
+                         unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following a HARVEST: SELL the just-harvested yield. Tiles with
+    no harvestable yield have no downstream.
+    """
+    farm = player.farms[player.player]
+    tile = tile_at(farm, unit_pos) if unit_pos is not None else None
+    if isinstance(tile, PlantState) and tile.yield_units > 0:
+        return [SellActionState(type="SELL", item=tile.crop, count=tile.yield_units)]
+    if isinstance(tile, AnimalState) and tile.animal is not None and tile.yield_units > 0:
+        product = ANIMAL_CONFIG[tile.animal].product
+        return [SellActionState(type="SELL", item=product, count=tile.yield_units)]
     return []

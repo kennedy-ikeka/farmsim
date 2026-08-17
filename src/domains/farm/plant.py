@@ -1,9 +1,15 @@
 from src.models.game import RealityState
 from src.utils.config import TURNS_PER_DAY
 from src.models.crops import CROP_CONFIG
-from src.models.action import PlantActionState
+from src.models.action import (
+    ActionState, PlantActionState, WaterActionState,
+    HarvestActionState, SellActionState,
+)
 from src.models.farm import PlantState
 from src.utils.farm import in_bounds
+from src.domains.farm.production import (
+    crop_water_days_remaining, crop_expected_yield,
+)
 
 
 def plant(state, farm, unit_pos, action: PlantActionState) -> dict:
@@ -71,3 +77,21 @@ def get_valid_plant_actions_for(player: RealityState, unit_pos) -> list[PlantAct
         for crop in type(seeds).model_fields
         if getattr(seeds, crop, 0) > 0
     ]
+
+
+def get_plant_pipeline(action: PlantActionState, player: RealityState,
+                       unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following a PLANT: one WATER per remaining bonus-window day,
+    then (for one-time crops) a HARVEST and a SELL of the expected yield.
+    Ongoing crops repeat, so they have no terminal HARVEST/SELL — only the
+    WATERs are returned.
+    """
+    day = player.day
+    waters = crop_water_days_remaining(action.crop, day, day)
+    pipeline: list[ActionState] = [WaterActionState(type="WATER") for _ in range(waters)]
+    if CROP_CONFIG[action.crop].yield_type == "one-time":
+        yield_units = crop_expected_yield(action.crop, day, day)
+        pipeline.append(HarvestActionState(type="HARVEST"))
+        if yield_units > 0:
+            pipeline.append(SellActionState(type="SELL", item=action.crop, count=yield_units))
+    return pipeline

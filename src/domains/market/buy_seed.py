@@ -1,5 +1,12 @@
+from src.models.game import RealityState
 from src.models.crops import CROP_CONFIG
-from src.models.action import BuySeedActionState
+from src.models.action import (
+    ActionState, BuySeedActionState, PlantActionState,
+    WaterActionState, HarvestActionState, SellActionState,
+)
+from src.domains.farm.production import (
+    crop_water_days_remaining, crop_expected_yield,
+)
 
 
 def buy_seed(state, action: BuySeedActionState) -> dict:
@@ -38,3 +45,23 @@ def get_valid_buy_seed_actions(player) -> list[BuySeedActionState]:
         for crop, cfg in CROP_CONFIG.items()
         if farm.money >= cfg.seed_cost
     ]
+
+
+def get_buy_seed_pipeline(action: BuySeedActionState, player: RealityState,
+                          unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following a BUY_SEED: PLANT the seed, then the plant's
+    downstream chain — one WATER per remaining bonus-window day, then (for
+    one-time crops) a HARVEST and a SELL of the expected yield. The PLANT's
+    tile is not known at buy time; the evaluator resolves it when the farmer
+    reaches an empty tile.
+    """
+    day = player.day
+    waters = crop_water_days_remaining(action.crop, day, day)
+    pipeline: list[ActionState] = [PlantActionState(type="PLANT", crop=action.crop)]
+    pipeline += [WaterActionState(type="WATER") for _ in range(waters)]
+    if CROP_CONFIG[action.crop].yield_type == "one-time":
+        yield_units = crop_expected_yield(action.crop, day, day)
+        pipeline.append(HarvestActionState(type="HARVEST"))
+        if yield_units > 0:
+            pipeline.append(SellActionState(type="SELL", item=action.crop, count=yield_units))
+    return pipeline

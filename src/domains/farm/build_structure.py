@@ -1,6 +1,11 @@
+from src.models.game import RealityState
 from src.models.farm import AnimalState
-from src.models.action import BuildCoopActionState, BuildPastureActionState
+from src.models.action import (
+    ActionState, BuildCoopActionState, BuildPastureActionState,
+    PlaceActionState,
+)
 from src.utils.farm import in_bounds
+from src.domains.farm.production import animal_pipeline, best_pasture_animal
 
 
 def build_structure(farm, unit_pos, action) -> dict:
@@ -42,3 +47,17 @@ def get_valid_build_actions_for(farm, unit_pos) -> list:
     if farm.tiles[row][col] is not None:
         return []
     return [BuildCoopActionState(type="BUILD_COOP"), BuildPastureActionState(type="BUILD_PASTURE")]
+
+
+def get_build_structure_pipeline(action: ActionState, player: RealityState,
+                                 unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following BUILD_COOP / BUILD_PASTURE: PLACE a matching animal on
+    the new structure, then the animal's per-day care + harvest + sell tail.
+    BUILD_COOP → GOOSE; BUILD_PASTURE → the better of COW / SHEEP by gross
+    production value at current prices.
+    """
+    if action.type == "BUILD_COOP":
+        animal = "GOOSE"
+    else:
+        animal = best_pasture_animal(player.market.prices)
+    return [PlaceActionState(type="PLACE", item=animal, count=1)] + animal_pipeline(animal, player.day)

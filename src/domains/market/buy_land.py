@@ -1,4 +1,5 @@
-from src.models.action import BuyLandActionState
+from src.models.game import RealityState
+from src.models.action import ActionState, BuyLandActionState
 
 
 # Unlock order (cheapest first) and fixed cost per quadrant.
@@ -54,6 +55,14 @@ def get_valid_buy_land_actions(player) -> list[BuyLandActionState]:
     if farm.money < QUADRANT_COST[next_quad]:
         return []
     return [BuyLandActionState(type="BUY_LAND")]
+
+
+def get_buy_land_pipeline(action: BuyLandActionState, player: RealityState,
+                          unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """BUY_LAND unlocks tiles; what gets built or planted on them is a
+    separate decision, so there is no deterministic next action.
+    """
+    return []
 
 
 def _unlock_quadrant(farm, quadrant):

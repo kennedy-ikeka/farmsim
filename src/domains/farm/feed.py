@@ -1,6 +1,10 @@
+from src.models.game import RealityState
 from src.models.farm import AnimalState
-from src.models.action import FeedActionState
-from src.utils.farm import in_bounds
+from src.models.action import (
+    ActionState, FeedActionState, HarvestActionState, SellActionState,
+)
+from src.models.animals import ANIMAL_CONFIG
+from src.utils.farm import in_bounds, tile_at
 
 
 def feed(state, farm, unit_pos, action) -> dict:
@@ -62,3 +66,19 @@ def get_valid_feed_actions_for(player, unit_pos) -> list[FeedActionState]:
     if player.private.shed.WHEAT <= 0:
         return []
     return [FeedActionState(type="FEED")]
+
+
+def get_feed_pipeline(action: FeedActionState, player: RealityState,
+                      unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following a FEED on an animal tile: HARVEST the animal's
+    product and SELL it. Non-animal tiles have no downstream.
+    """
+    farm = player.farms[player.player]
+    tile = tile_at(farm, unit_pos) if unit_pos is not None else None
+    if isinstance(tile, AnimalState) and tile.animal is not None:
+        product = ANIMAL_CONFIG[tile.animal].product
+        pipeline: list[ActionState] = [HarvestActionState(type="HARVEST")]
+        if tile.yield_units > 0:
+            pipeline.append(SellActionState(type="SELL", item=product, count=tile.yield_units))
+        return pipeline
+    return []

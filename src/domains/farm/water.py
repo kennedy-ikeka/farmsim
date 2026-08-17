@@ -1,9 +1,12 @@
 import math
 
+from src.models.game import RealityState
 from src.models.crops import CROP_CONFIG
-from src.models.action import WaterActionState
+from src.models.action import (
+    ActionState, WaterActionState, HarvestActionState, SellActionState,
+)
 from src.models.farm import PlantState
-from src.utils.farm import in_bounds
+from src.utils.farm import in_bounds, tile_at
 
 
 def water(state, farm, unit_pos) -> dict:
@@ -72,3 +75,18 @@ def get_valid_water_actions_for(farm, unit_pos) -> list[WaterActionState]:
     if isinstance(tile, PlantState) and not tile.watered_today:
         return [WaterActionState(type="WATER")]
     return []
+
+
+def get_water_pipeline(action: WaterActionState, player: RealityState,
+                       unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following a WATER on a plant tile: HARVEST the accumulated
+    yield and SELL it. Non-plant tiles have no downstream.
+    """
+    farm = player.farms[player.player]
+    tile = tile_at(farm, unit_pos) if unit_pos is not None else None
+    if not isinstance(tile, PlantState):
+        return []
+    pipeline: list[ActionState] = [HarvestActionState(type="HARVEST")]
+    if tile.yield_units > 0:
+        pipeline.append(SellActionState(type="SELL", item=tile.crop, count=tile.yield_units))
+    return pipeline

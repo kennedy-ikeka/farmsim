@@ -1,4 +1,5 @@
-from src.models.action import SellActionState
+from src.models.game import RealityState
+from src.models.action import ActionState, SellActionState
 
 
 def sell(state, action: SellActionState) -> dict:
@@ -35,3 +36,11 @@ def get_valid_sell_actions(player) -> list[SellActionState]:
         for item in type(prices).model_fields
         if getattr(shed, item, 0) > 0 and getattr(prices, item, 0) > 0
     ]
+
+
+def get_sell_pipeline(action: SellActionState, player: RealityState,
+                      unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """SELL realizes money immediately — it is the terminal step in any
+    production chain, so the pipeline is empty.
+    """
+    return []

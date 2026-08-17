@@ -1,6 +1,8 @@
 from typing import get_args
 
-from src.models.action import BuyProductActionState
+from src.models.game import RealityState
+
+from src.models.action import ActionState, BuyProductActionState
 from src.models.objects import BUYABLE_PRODUCTS
 
 
@@ -51,3 +53,12 @@ def get_valid_buy_product_actions(player) -> list[BuyProductActionState]:
         if price > 0 and available > 0 and farm.money >= price:
             actions.append(BuyProductActionState(type="BUY_PRODUCT", item=item, count=1))
     return actions
+
+
+def get_buy_product_pipeline(action: BuyProductActionState, player: RealityState,
+                             unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """BUY_PRODUCT buys an input (WHEAT for FEED, FERTILIZER for FERTILIZE) —
+    its use depends on where the player later deploys it, so there is no
+    deterministic next action.
+    """
+    return []

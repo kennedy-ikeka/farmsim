@@ -1,5 +1,6 @@
+from src.models.game import RealityState
 from src.utils.farm import ensure_inventory, is_shed_adjacent, in_bounds
-from src.models.action import PickupActionState
+from src.models.action import ActionState, PickupActionState
 
 
 def pickup(state, farm, unit_pos, action: PickupActionState, inv_index: int) -> dict:
@@ -67,3 +68,12 @@ def get_valid_pickup_actions_for(player, unit_pos, inv_index) -> list[PickupActi
         for item in type(shed).model_fields
         if getattr(shed, item, 0) > 0
     ]
+
+
+def get_pickup_pipeline(action: PickupActionState, player: RealityState,
+                       unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """PICKUP moves a shed item into a hand's inventory for transport; the item
+    is later PLACE-dropped back or used, so there is no deterministic next
+    action.
+    """
+    return []

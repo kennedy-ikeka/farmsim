@@ -1,4 +1,5 @@
-from src.models.action import DigActionState
+from src.models.game import RealityState
+from src.models.action import ActionState, DigActionState
 from src.models.farm import PlantState, WeedState, AnimalState
 from src.utils.farm import in_bounds
 
@@ -60,4 +61,12 @@ def get_valid_dig_actions_for(farm, unit_pos) -> list[DigActionState]:
         return [DigActionState(type="DIG")]
     if isinstance(tile, AnimalState) and tile.animal is None:
         return [DigActionState(type="DIG")]
+    return []
+
+
+def get_dig_pipeline(action: DigActionState, player: RealityState,
+                     unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """DIG clears a tile; the cleared land enables future PLANT or BUILD actions
+    but has no deterministic next action, so the pipeline is empty.
+    """
     return []

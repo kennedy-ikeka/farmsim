@@ -1,6 +1,14 @@
-from src.models.action import FertilizeActionState
+from src.models.game import RealityState
+from src.models.crops import CROP_CONFIG
+from src.models.action import (
+    ActionState, FertilizeActionState, WaterActionState,
+    HarvestActionState, SellActionState,
+)
 from src.models.farm import PlantState
-from src.utils.farm import in_bounds
+from src.utils.farm import in_bounds, tile_at
+from src.domains.farm.production import (
+    crop_water_days_remaining, crop_expected_yield,
+)
 
 
 def fertilize(state, farm, unit_pos, action: FertilizeActionState) -> dict:
@@ -56,3 +64,25 @@ def get_valid_fertilize_actions_for(player, unit_pos) -> list[FertilizeActionSta
     if player.private.shed.FERTILIZER <= 0:
         return []
     return [FertilizeActionState(type="FERTILIZE")]
+
+
+def get_fertilize_pipeline(action: FertilizeActionState, player: RealityState,
+                           unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following a FERTILIZE on a plant tile: the remaining bonus-window
+    WATERs (the next 3 of which carry the +1 fertilize bonus), then (for one-time
+    crops) a HARVEST and a SELL of the expected yield. Non-plant tiles have no
+    downstream.
+    """
+    farm = player.farms[player.player]
+    tile = tile_at(farm, unit_pos) if unit_pos is not None else None
+    if not isinstance(tile, PlantState):
+        return []
+    day = player.day
+    waters = crop_water_days_remaining(tile.crop, tile.planted_day, day)
+    pipeline: list[ActionState] = [WaterActionState(type="WATER") for _ in range(waters)]
+    if CROP_CONFIG[tile.crop].yield_type == "one-time":
+        yield_units = crop_expected_yield(tile.crop, tile.planted_day, day)
+        pipeline.append(HarvestActionState(type="HARVEST"))
+        if yield_units > 0:
+            pipeline.append(SellActionState(type="SELL", item=tile.crop, count=yield_units))
+    return pipeline

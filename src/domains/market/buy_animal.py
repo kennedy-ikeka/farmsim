@@ -1,5 +1,7 @@
+from src.models.game import RealityState
 from src.models.animals import ANIMAL_CONFIG
-from src.models.action import BuyAnimalActionState
+from src.models.action import ActionState, BuyAnimalActionState, PlaceActionState
+from src.domains.farm.production import animal_pipeline
 
 
 def buy_animal(state, action: BuyAnimalActionState) -> dict:
@@ -37,3 +39,12 @@ def get_valid_buy_animal_actions(player) -> list[BuyAnimalActionState]:
         for animal, cfg in ANIMAL_CONFIG.items()
         if farm.money >= cfg.cost
     ]
+
+
+def get_buy_animal_pipeline(action: BuyAnimalActionState, player: RealityState,
+                            unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """Actions following a BUY_ANIMAL: PLACE the animal on a matching
+    structure, then the animal's per-day care + harvest + sell tail. The
+    structure tile is not known at buy time; the evaluator resolves it.
+    """
+    return [PlaceActionState(type="PLACE", item=action.animal, count=1)] + animal_pipeline(action.animal, player.day)

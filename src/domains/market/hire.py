@@ -1,4 +1,5 @@
-from src.models.action import HireActionState
+from src.models.game import RealityState
+from src.models.action import ActionState, HireActionState
 
 
 # Default multiplier applied to the Fibonacci hire-cost sequence.
@@ -78,3 +79,11 @@ def get_valid_hire_actions(player) -> list[HireActionState]:
     if farm.money < cost:
         return []
     return [HireActionState(type="HIRE")]
+
+
+def get_hire_pipeline(action: HireActionState, player: RealityState,
+                      unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """HIRE adds a farm hand; the hand's downstream actions depend on where it
+    is deployed, so there is no deterministic next action.
+    """
+    return []

@@ -1,5 +1,8 @@
+from src.models.game import RealityState
 from src.models.farm import AnimalState
-from src.models.action import CollectFertilizerActionState
+from src.models.action import (
+    ActionState, CollectFertilizerActionState, SellActionState,
+)
 from src.utils.farm import in_bounds
 
 
@@ -56,3 +59,12 @@ def get_valid_collect_fertilizer_actions_for(farm, unit_pos) -> list[CollectFert
     if tile.fertilizer_available <= 0:
         return []
     return [CollectFertilizerActionState(type="COLLECT_FERTILIZER")]
+
+
+def get_collect_fertilizer_pipeline(action: CollectFertilizerActionState,
+                                    player: RealityState, unit_pos=None,
+                                    inv_index: int = 0) -> list[ActionState]:
+    """Actions following COLLECT_FERTILIZER: the collected fertilizer can be
+    sold, so SELL one FERTILIZER unit.
+    """
+    return [SellActionState(type="SELL", item="FERTILIZER", count=1)]

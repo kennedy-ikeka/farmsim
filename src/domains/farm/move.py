@@ -1,4 +1,5 @@
-from src.models.action import MOVE_ACTIONS, MoveActionState
+from src.models.game import RealityState
+from src.models.action import ActionState, MOVE_ACTIONS, MoveActionState
 from src.models.farm import FarmState
 
 # [row, column] deltas — farm.farmer is [row, column] per FarmState.
@@ -55,3 +56,11 @@ def get_valid_move_actions_for(farm: FarmState, unit_pos) -> list[MoveActionStat
         for act, (dr, dc) in _MOVE_DELTAS.items()
         if 0 <= row + dr < rows and 0 <= col + dc < cols
     ]
+
+
+def get_move_pipeline(action: MoveActionState, player: RealityState,
+                      unit_pos=None, inv_index: int = 0) -> list[ActionState]:
+    """MOVE repositions a unit; downstream actions depend on the destination
+    tile, which is not determined here, so the pipeline is empty.
+    """
+    return []

@@ -113,17 +113,13 @@ def evaluate_immediate_delta(action: ActionState, player: RealityState, unit_pos
     })
 
 
-def evaluate_future_delta(action: ActionState, player: RealityState, unit_pos=None, inv_index: int = 0) -> ResourceState:
+def evaluate_pipeline(action: ActionState, player: RealityState, unit_pos=None, inv_index: int = 0) -> ResourceState:
     """Per-category projected (future) resource delta from `action`.
 
     Stub — to be reimplemented from scratch. Will capture the deferred
     consequences of an action (e.g. PLANT's future harvest sale) that are
     not reflected in the immediate state delta from `evaluate_immediate_delta`.
     """
-    ...
-
-
-def evaluate_immediate_delta_risk(action: ActionState, player: RealityState, unit_pos=None, inv_index: int = 0) -> ResourceState:
     ...
 
 
