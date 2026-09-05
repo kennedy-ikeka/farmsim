@@ -1,0 +1,20 @@
+[project]
+name = "simulations"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.11.1",
+    "numpy>=2.5.2",
+    "pandas>=3.0.5",
+    "seaborn>=0.13.2",
+    "simpy>=4.1.2",
+]
+
+[project.scripts]
+simulations = "simulations:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
