@@ -9,4 +9,7 @@ class Entity:
     def log(self, message: str):
         if self.verbose:
             print(f"[{self.env.now}] {self.name}: {message}")
-            
+
+    def run(self, until):
+        """Run the entity"""
+        self.env.run(until=until)            

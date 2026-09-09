@@ -1,13 +1,12 @@
 import simpy
 import numpy as np
 
-from src.simulations.entity import Entity
-from src.simulations.pond import Pond
-from utils.conversion import to_grams
+from src.models.animal import AnimalModel
+from src.models.pond import PondModel
 
-class Fish(Entity):
+class Fish(AnimalModel):
     """A fish entity in the the simulation"""
-    def __init__(self, pond: Pond, id, weight, verbose=True):
+    def __init__(self, pond: PondModel, id, weight, verbose=True):
         super().__init__(pond.env, name=f"Fish-{id}", verbose=verbose)
         self.pond = pond
         self.id = id
@@ -76,6 +75,10 @@ class Fish(Entity):
             hunger_weight = self.get_hunger_weight() 
             feed_weight = hunger_weight * quench_rate
 
+            if feed_weight <= 0:
+                self.log("Not hungry, skip hunting")
+                return
+            
             yield self.pond.feed.get(feed_weight) # Catch feed
             self.log(f"Caught feed weighing {feed_weight}")
             
@@ -109,7 +112,5 @@ class Fish(Entity):
 
             yield self.env.process(self.excrete(excrete_weight=excrete_weight)) # Excrete
 
-    def run(self, until=100):
-        """Run the fish simulation"""
-        self.env.run(until=until)
-        
+    def die(self):
+        ...
