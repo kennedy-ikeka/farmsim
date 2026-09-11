@@ -1,32 +1,38 @@
+import simpy
 from typing_extensions import Generator, Literal
 
+from src.models.animal import AnimalModel
 from src.models.entity import Entity
 
 POND_TYPES = Literal[
-    "Earthen", 
-    "Concrete", 
-    "Portable"
+    "Earthen_Pond", 
+    "Concrete_Pond", 
+    "Portable_Pond"
 ]
 
 POND_BASE_COSTS = {
-    "Earthen": 1500, # Cheapest to construct
-    "Concrete": 6000, # Very expensive to construct
-    "Portable": 4000, # Moderatly expenseive to purchase
+    "Earthen_Pond": 1500, # Cheapest to construct
+    "Concrete_Pond": 6000, # Very expensive to construct
+    "Portable_Pond": 4000, # Moderatly expenseive to purchase
 }
 
 POND_CONTAMINATION_RATE = {
-    "Earthen": 0.4,    # 40% relative risk
-    "Concrete": 0.15,  # 15% relative risk
-    "Portable": 0.07   # 7% relative risk
+    "Earthen_Pond": 0.4,    # 40% relative risk
+    "Concrete_Pond": 0.15,  # 15% relative risk
+    "Portable_Pond": 0.07   # 7% relative risk
 }
 
 POND_SPAWN_FEED_RATE = {
-    "Earthen": 1.0,   # baseline, rich natural feed
-    "Concrete": 0.6,  # moderate natural feed
-    "Portable": 0.2   # very low natural feed
+    "Earthen_Pond": 1.0,   # baseline, rich natural feed
+    "Concrete_Pond": 0.6,  # moderate natural feed
+    "Portable_Pond": 0.2   # very low natural feed
 }
 
 class PondModel(Entity):
+    fishes: list[AnimalModel]
+    feed: simpy.Container
+    health: simpy.Container
+
     def get_cost(self) -> float:
         ...
 

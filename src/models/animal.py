@@ -1,8 +1,16 @@
-from typing_extensions import Generator
+import simpy
+from typing_extensions import Generator, Literal
 
 from src.models.entity import Entity
 
+ANIMAL_TYPE = Literal[
+    "Catfish",
+    "Tilapia"
+]
+
 class AnimalModel(Entity):
+    weight: simpy.Container
+    
     def get_hunger_rate(self) -> float:
         ...
 

@@ -6,6 +6,8 @@ import numpy as np
 from src.models.entity import Entity
 
 class FeedModel(Entity): 
+    size: float
+
     def expire(self) -> Generator:
         ...
 

@@ -1,10 +1,13 @@
+import statistics
+
 import numpy as np
 from faker import Faker
 
+from simulations.fish import Fish
+from src.simulations.feed import Feed
 from src.models.farm import FarmModel
 from src.models.cycle import CycleModel
 from src.models.pond import PondModel
-from src.models.feed import FeedModel
 from src.models.animal import AnimalModel
 
 
@@ -13,7 +16,7 @@ faker = Faker()
 class Cycle(CycleModel):
     """A full farming circle, from stocking to harvest"""
     def __init__(self, env, farm: FarmModel, pond: PondModel, num_fishes: int, avg_weight: float):
-        super().__init__(env, name="Circle")
+        super().__init__(env, "Circle")
         self.farm = farm
         self.pond = pond
         self.t_next_feeding = float('inf')
@@ -43,18 +46,22 @@ class Cycle(CycleModel):
         # Buy the fishes and pay for them
         cost_per_fish = np.random.uniform(25, 30)
         total_cost = num_fishes * cost_per_fish
-        yield self.env.process(self.transact("debit", total_cost, "fishes", num_fishes))
+        yield self.env.process(self.farm.transact("debit", total_cost, "fishes", num_fishes))
 
         # Create the fishes and stock them in the pond
         self.fishes = [
-            AnimalModel(pond=self.pond, id=id, weight=np.random.exponential(avg_weight), verbose=False)
+            Fish(pond=self.pond, id=id, weight=np.random.exponential(avg_weight), verbose=False)
             for id in range(num_fishes)
         ]
         self.start_time = self.env.now
 
         # Start the feeding process
         self.t_next_feeding = 1 # The next feeding time after fish stocking is 1 day
-        yield self.env.process(self.feed_fishes_process())
+        yield self.env.process(self.feed_fishes())
+
+    def get_feeding_hours(self):
+        """Get the feeding timetable"""
+        return [9, 17] # 9am, 5pm
 
     def get_next_feeding_time(self):
         """Get the next time to feed the fishes based on feeding hours"""
@@ -73,6 +80,33 @@ class Cycle(CycleModel):
         # If all feeding hours have passed, return the first feeding hour of the next day
         return round(day + 1 + (feeding_hours[0]/24) - now, 6)
 
+    def get_feed_size(self):
+        """Get the appropriate feed size based on the median weight of the fishes"""
+        median_weight = statistics.median(f.weight.level for f in self.fishes)
+
+        if median_weight < 0.005:
+            return 0.8
+        elif median_weight < 0.02:
+            return 1.2
+        elif median_weight < 0.05:
+            return 1.5
+        elif median_weight < 0.1:
+            return 2.0
+        elif median_weight < 0.25:
+            return 3.0
+        elif median_weight < 0.5:
+            return 4.0
+        elif median_weight < 0.8:
+            return 5.0
+        return 6.0
+
+    def get_appropriate_feed(self):
+        """Get the appropriate feed in stock based on the median weight of the fishes"""
+        size = self.get_feed_size()
+        for f in self.farm.feeds:
+            if f.size == size:
+                return f
+            
     def get_age(self):
         """Get the age of this circle"""
         return int(self.env.now - self.start_time)
@@ -84,13 +118,13 @@ class Cycle(CycleModel):
             yield self.env.timeout(self.t_next_feeding)
 
             # select the appropriate feed
-            feed = self.get_appropriate_feed()
+            feed = self.farm.get_appropriate_feed()
             if feed == None:
                 # buy feed
                 self.log(f'Appropriate feed not found')
-                feed_size = self.get_feed_size()
-                feed = FeedModel(env=self.env, name=faker.name(), size=feed_size, verbose=False)
-                self.feeds.append(feed)
+                feed_size = self.farm.get_feed_size()
+                feed = Feed(env=self.env, name=faker.name(), size=feed_size, verbose=False)
+                self.farm.feeds.append(feed)
 
             # Get the feed to be consumed by each fish
             feed_weights = [

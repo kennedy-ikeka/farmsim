@@ -1,14 +1,14 @@
 import simpy
 
 class Entity:
-    def __init__(self, env: simpy.Environment, name: str, verbose: bool = True):
+    def __init__(self, env: simpy.Environment, tag: str, verbose: bool = False):
         self.env = env
-        self.name = name
+        self.tag = tag
         self.verbose = verbose
 
     def log(self, message: str):
         if self.verbose:
-            print(f"[{self.env.now}] {self.name}: {message}")
+            print(f"[{self.env.now}] {self.tag}: {message}")
 
     def run(self, until):
         """Run the entity"""

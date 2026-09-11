@@ -5,13 +5,13 @@ from src.models.pond import POND_BASE_COSTS, POND_CONTAMINATION_RATE, POND_SPAWN
 
 
 class Pond(PondModel):
-    def __init__(self, env, id, type: POND_TYPES, height, width, depth, density = 1, rental_rate=0.1, aerated=False, verbose=True):
-        super().__init__(env, name=f"Pond-{type}-{id}", verbose=verbose)
+    def __init__(self, env, id: int, type: POND_TYPES, length=1.0, width=1.0, depth=1.0, density = 1.0, rental_rate=0.1, aerated=False, verbose=False):
+        super().__init__(env, f"{type}_{id}", verbose=verbose)
         self.id = id
-        self.height = height
+        self.length = length
         self.width = width
         self.depth = depth
-        self.volumn = height * width * depth
+        self.volumn = length * width * depth
         self.type = type
         self.density = density
         self.capacity = self.volumn * density
@@ -54,7 +54,7 @@ class Pond(PondModel):
 
     def decontaminate(self):
         """Decontaminate the pond"""
-
+    
         # Drain the water
         t_drain = np.random.exponential(1/24)
         yield self.env.timeout(t_drain)

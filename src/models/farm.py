@@ -1,3 +1,4 @@
+import simpy
 from typing_extensions import Generator, Literal
 
 from src.models.feed import FeedModel
@@ -6,6 +7,9 @@ from src.models.entity import Entity
 TRANSACTION_TYPES = Literal["credit", "debit"]
 
 class FarmModel(Entity):
+    money: simpy.Container
+    feeds: list[FeedModel]
+    
     def transact(self, type: TRANSACTION_TYPES, amount, item, quantity=1) -> Generator:
         ...
 
@@ -18,7 +22,7 @@ class FarmModel(Entity):
     def feed_exists(self, size: float) -> bool:
         ...
         
-    def stock_feed_process(self, feed: FeedModel, weight: bool) -> Generator:
+    def stock_feed_process(self, feed: FeedModel, weight: float) -> Generator:
         ...
 
     def acquire_pond(self) -> Generator:

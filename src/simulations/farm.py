@@ -4,15 +4,16 @@ import simpy
 from typing_extensions import Literal
 import numpy as np
 
+from models.feed import FeedModel
+from src.models.pond import PondModel
 from src.models.farm import FarmModel
-from entities.cycle import Cycle
-from src.entities.feed import Feed
-from src.entities.pond import Pond
+from simulations.cycle import Cycle
+from src.simulations.feed import Feed
 from src.utils.conversion import to_kobo, to_naira
 
 
 class Farm(FarmModel):
-    def __init__(self, env, name, money, ponds: list[Pond]=[], feeds: list[Feed]=[], verbose = True):
+    def __init__(self, env, name, money, ponds: list[PondModel]=[], feeds: list[FeedModel]=[], verbose = True):
         super().__init__(env, name, verbose)
         self.ponds = ponds
         self.feeds = feeds
@@ -25,7 +26,7 @@ class Farm(FarmModel):
 
         self.cycles: list[Cycle] = []
 
-    def transact(self, action: Literal["credit", "debit"], amount, item, quantity=1):
+    def transact(self, action: Literal["credit", "debit"], amount, item, quantity=1.0):
         """Spend money from the circle"""
         kobo_amount = to_kobo(amount)
         if action == "debit":
@@ -41,33 +42,6 @@ class Farm(FarmModel):
             'item': item,
             'quantity': quantity
         })
-
-    def get_feed_size(self):
-        """Get the appropriate feed size based on the median weight of the fishes"""
-        median_weight = statistics.median(f.weight.level for f in self.fishes)
-
-        if median_weight < 0.005:
-            return 0.8
-        elif median_weight < 0.02:
-            return 1.2
-        elif median_weight < 0.05:
-            return 1.5
-        elif median_weight < 0.1:
-            return 2.0
-        elif median_weight < 0.25:
-            return 3.0
-        elif median_weight < 0.5:
-            return 4.0
-        elif median_weight < 0.8:
-            return 5.0
-        return 6.0
-
-    def get_appropriate_feed(self):
-        """Get the appropriate feed in stock based on the median weight of the fishes"""
-        size = self.get_feed_size()
-        for f in self.feeds:
-            if f.size == size:
-                return f
 
     def feed_exists(self, size):
         """Check if the size of feed is available in stock"""

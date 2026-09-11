@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "faker>=40.38.0",
+    "ipykernel>=7.3.0",
     "matplotlib>=3.11.1",
     "numpy>=2.5.2",
     "pandas>=3.0.5",
+    "pytest>=9.1.1",
     "seaborn>=0.13.2",
     "simpy>=4.1.2",
 ]
@@ -19,3 +21,15 @@ simulations = "simulations:main"
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "only: mark test to be run exclusively"
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "watchfiles>=1.2.0",
+]

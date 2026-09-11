@@ -1,14 +1,15 @@
 import simpy
 import numpy as np
 
-from src.models.animal import AnimalModel
+from src.models.animal import ANIMAL_TYPE, AnimalModel
 from src.models.pond import PondModel
 
 class Fish(AnimalModel):
     """A fish entity in the the simulation"""
-    def __init__(self, pond: PondModel, id, weight, verbose=True):
-        super().__init__(pond.env, name=f"Fish-{id}", verbose=verbose)
+    def __init__(self, pond: PondModel, id: int, type: ANIMAL_TYPE, weight: float, verbose=False):
+        super().__init__(pond.env, tag=f"{type}_{id}", verbose=verbose)
         self.pond = pond
+        self.type = type
         self.id = id
         self.weight = simpy.Container(pond.env, init=weight)
         self.stomach = simpy.Container(pond.env, capacity=100, init=np.random.uniform(0, 100))
