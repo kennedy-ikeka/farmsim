@@ -1,22 +1,26 @@
 import simpy
 import numpy as np
+from math import sqrt
+from scipy import stats
 
 from src.models.animal import ANIMAL_TYPE, AnimalModel
 from src.models.pond import PondModel
 
 class Fish(AnimalModel):
     """A fish entity in the the simulation"""
-    def __init__(self, pond: PondModel, id: int, type: ANIMAL_TYPE, weight: float, verbose=False):
-        super().__init__(pond.env, tag=f"{type}_{id}", verbose=verbose)
+    def __init__(self, pond: PondModel, id: int, type: ANIMAL_TYPE, weight: float, stomach=50, verbose=False, seed=0):
+        super().__init__(pond.env, tag=f"{type}_{id}", verbose=verbose, seed=seed)
         self.pond = pond
         self.type = type
         self.id = id
         self.weight = simpy.Container(pond.env, init=weight)
-        self.stomach = simpy.Container(pond.env, capacity=100, init=np.random.uniform(0, 100))
+        self.stomach = simpy.Container(pond.env, capacity=100, init=stomach)
+        self.data = {
+            "feeding": [],
+            "excretion": []
+        }
         
-        self.hunt_process = self.env.process(self.hunt()) # hunt for feed
-        self.digest_process = self.env.process(self.digest()) # excrete waste
-
+        self.live_process = self.env.process(self.live())
         self.pond.fishes.append(self)
 
     def __str__(self):
@@ -33,6 +37,21 @@ class Fish(AnimalModel):
         empty_stomach = self.stomach.capacity - self.stomach.level
         return empty_stomach / self.stomach.capacity
 
+    def get_hunt_rate(self):
+        """Get the hunt rate of the fish"""
+        return self.get_hunger_rate() * sqrt(self.weight.level)
+
+    def get_feeding_rank(self) -> float:
+        rates = sum(
+            f.get_hunt_rate() 
+            for f in self.pond.fishes
+        )
+        if rates == 0:
+            return 0
+        
+        hunt_rate = self.get_hunt_rate()
+        return hunt_rate / rates
+
     def get_stomach_size(self):
         """Get the stomach size with respect to the weight"""
         return self.weight.level * 0.1
@@ -41,7 +60,7 @@ class Fish(AnimalModel):
         """Get the maximum weight of feed it can consume at the moment"""
         hunger_rate = self.get_hunger_rate() 
         stomach_size = self.get_stomach_size()
-        return hunger_rate * stomach_size
+        return hunger_rate * stomach_size        
 
     def get_waste_weight(self):
         """Get the maximum weight of waste it can produce at the moment"""
@@ -51,39 +70,23 @@ class Fish(AnimalModel):
 
     def eat(self, feed_weight, fcr=1):
         """Quench hunger by amount of feed"""
-        if feed_weight == 0:
+        if feed_weight <= 0:
             return
         
         hunger_weight = self.get_hunger_weight()
-        quench_rate = feed_weight / hunger_weight
+        can_eat = min(hunger_weight, feed_weight) # Can only eat as much as it is hungry
+        quench_rate = can_eat / hunger_weight
         quench_level = quench_rate * (self.stomach.capacity - self.stomach.level)
+
+        yield self.pond.feed.get(can_eat) # Catch feed
+        self.log(f"Eat feed weighing {can_eat}")
 
         yield self.stomach.put(quench_level) # Quench hunger
         self.log(f"Quenched {((quench_level * 100)/self.stomach.capacity):.2f}% of hunger")
 
-        weight_gained = feed_weight/fcr
+        weight_gained = can_eat/fcr
         yield self.weight.put(weight_gained) # Gain weight
         self.log(f"Gained weight by ({(weight_gained * 100)/self.weight.level:.2f}% )")
-
-    def hunt(self):
-        """Hunt for food in the pond"""
-        while True:
-            t_hunt = np.random.exponential(1/4)
-            yield self.env.timeout(t_hunt)
-            self.log(f"Hunting for food in the pond")
-
-            quench_rate = np.random.uniform(0.8, 1) # It catches most of the feed
-            hunger_weight = self.get_hunger_weight() 
-            feed_weight = hunger_weight * quench_rate
-
-            if feed_weight <= 0:
-                self.log("Not hungry, skip hunting")
-                return
-            
-            yield self.pond.feed.get(feed_weight) # Catch feed
-            self.log(f"Caught feed weighing {feed_weight}")
-            
-            yield self.env.process(self.eat(feed_weight=feed_weight)) # Eat
 
     def excrete(self, excrete_weight):
         """Excrete waste"""
@@ -91,27 +94,45 @@ class Fish(AnimalModel):
             return
         
         waste_weight = self.get_waste_weight() 
-        excrete_rate = excrete_weight / waste_weight
+        can_waste = min(waste_weight, excrete_weight)
+        excrete_rate = can_waste / waste_weight
         excrete_level = excrete_rate * self.stomach.level
 
         yield self.stomach.get(excrete_level) # become hungrier
         self.log(f"Excreted, gained {((excrete_level * 100)/self.stomach.capacity):.2f}% of hunger")
 
-        weight_lost = excrete_weight * excrete_rate
+        weight_lost = can_waste * excrete_rate
         yield self.weight.get(weight_lost) # Lose weight
         self.log(f"Lost weight by ({(weight_lost * 100)/self.weight.level:.2f}% )")
+        
+    def hunt(self):
+        """Hunt for food in the pond"""
+        t_hunt = self.rng.exponential(1/4)
+        yield self.env.timeout(t_hunt)
+        self.log(f"Hunting for food in the pond")
+
+        feed_availability = self.pond.get_feed_availability()
+        feeding_rank = self.get_feeding_rank()        
+        hunt_weight = feed_availability * feeding_rank
+
+        self.log(f"Caught feed weighing {hunt_weight}")
+        yield self.env.process(self.eat(feed_weight=hunt_weight, fcr=1)) # Eat
 
     def digest(self):
         """Release excrements after eating"""
+        t_excrete = self.rng.exponential(1/3)
+        yield self.env.timeout(t_excrete)
+
+        excrement_rate = self.rng.uniform(0.5, 1)
+        waste_weight = self.get_waste_weight() 
+        excrete_weight = waste_weight * excrement_rate
+
+        yield self.env.process(self.excrete(excrete_weight=excrete_weight)) # Excrete
+            
+    def live(self):
         while True:
-            t_excrete = np.random.exponential(1/3)
-            yield self.env.timeout(t_excrete)
-
-            excrement_rate = np.random.uniform(0.5, 1)
-            waste_weight = self.get_waste_weight() 
-            excrete_weight = waste_weight * excrement_rate
-
-            yield self.env.process(self.excrete(excrete_weight=excrete_weight)) # Excrete
-
+            yield self.env.process(self.hunt()) # hunt for feed
+            yield self.env.process(self.digest()) # excrete waste
+            
     def die(self):
         ...

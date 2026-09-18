@@ -1,3 +1,5 @@
+from math import sqrt
+
 import simpy
 import numpy as np
 
@@ -11,15 +13,15 @@ class Pond(PondModel):
         self.length = length
         self.width = width
         self.depth = depth
-        self.volumn = length * width * depth
+        self.volume = length * width * depth
         self.type = type
         self.density = density
-        self.capacity = self.volumn * density
+        self.capacity = self.volume * density
         self.aerated = aerated
         self.rental_rate = rental_rate
         
         self.health = simpy.Container(env=env, capacity=100, init=100)
-        self.water = simpy.Container(env=env, capacity=self.volumn, init=self.volumn)
+        self.water = simpy.Container(env=env, capacity=self.volume, init=self.volume)
         self.feed = simpy.Container(env=env, init=0)
         self.fishes = []
 
@@ -29,12 +31,17 @@ class Pond(PondModel):
         # Start the feed spawning process
         self.spawn_feed_process = self.env.process(self.spawn_feed())
 
+    def get_feed_availability(self) -> float:
+        feed = self.feed.level
+        size = sqrt(self.length * self.width)
+        return feed / size
+
     def get_cost(self):
         base_cost = POND_BASE_COSTS[self.type]
         adjustment = 1.0
         if self.aerated:
             adjustment += 0.1 * self.density
-        return self.volumn * base_cost * adjustment 
+        return self.volume * base_cost * adjustment 
 
     def get_rent_cost(self, duration=1):
         cost = self.get_cost()
@@ -43,10 +50,10 @@ class Pond(PondModel):
     def spawn_feed(self):
         """Spawn feed in the pond"""
         while True:
-            t_spawn = np.random.exponential(1/4)
+            t_spawn = self.rng.exponential(1/4)
             yield self.env.timeout(t_spawn)
 
-            feed_capacity = self.volumn * 0.1
+            feed_capacity = self.volume * 0.1
             spawn_rate = POND_SPAWN_FEED_RATE[self.type]
             feed_weight = spawn_rate * feed_capacity
             yield self.feed.put(feed_weight)
@@ -56,26 +63,30 @@ class Pond(PondModel):
         """Decontaminate the pond"""
     
         # Drain the water
-        t_drain = np.random.exponential(1/24)
+        t_drain = self.rng.exponential(1/24)
         yield self.env.timeout(t_drain)
         yield self.water.get(self.water.level)
         self.log("Drained pond water")
 
         # Fill the pond with clean water    
-        t_fill = np.random.exponential(1/24)
+        t_fill = self.rng.exponential(1/24)
         yield self.env.timeout(t_fill)
-        yield self.water.put(self.volumn)
+        yield self.water.put(self.volume)
         yield self.health.put(self.health.capacity - self.health.level)
         self.log("Decontaminated pond")
 
     def contaminate(self):
         """Contaminate the water in the pond"""
         while True:
-            t_contaminate = np.random.exponential(1/6)
+            t_contaminate = self.rng.exponential(1/6)
             yield self.env.timeout(t_contaminate)
 
-            base_rate = POND_CONTAMINATION_RATE[self.type]/self.volumn
+            base_rate = POND_CONTAMINATION_RATE[self.type]/self.volume
             sick_effect = (self.health.capacity / (max(1, self.health.level)))
             contaminate_rate = base_rate * sick_effect
             yield self.health.get(contaminate_rate)
             self.log('Contaminated pond')
+
+    def get_fish_by_id(self, id):
+        found = filter(lambda f: f.id == id, self.fishes)
+        return next(found) 

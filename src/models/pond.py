@@ -33,6 +33,9 @@ class PondModel(Entity):
     feed: simpy.Container
     health: simpy.Container
 
+    def get_feed_availability(self) -> float:
+        ...
+        
     def get_cost(self) -> float:
         ...
 

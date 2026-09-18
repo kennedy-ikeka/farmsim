@@ -41,16 +41,16 @@ class Cycle(CycleModel):
     def stock_fishes(self, num_fishes, avg_weight):
         """Buy the fishes for the circle"""
         self.log(f"Waiting to stock fishes at {self.env.now}")
-        yield self.env.timeout(np.random.randint(1, 3))
+        yield self.env.timeout(self.rng.randint(1, 3))
 
         # Buy the fishes and pay for them
-        cost_per_fish = np.random.uniform(25, 30)
+        cost_per_fish = self.rng.uniform(25, 30)
         total_cost = num_fishes * cost_per_fish
         yield self.env.process(self.farm.transact("debit", total_cost, "fishes", num_fishes))
 
         # Create the fishes and stock them in the pond
         self.fishes = [
-            Fish(pond=self.pond, id=id, weight=np.random.exponential(avg_weight), verbose=False)
+            Fish(pond=self.pond, id=id, weight=self.rng.exponential(avg_weight), verbose=False)
             for id in range(num_fishes)
         ]
         self.start_time = self.env.now

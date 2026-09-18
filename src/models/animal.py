@@ -10,8 +10,12 @@ ANIMAL_TYPE = Literal[
 
 class AnimalModel(Entity):
     weight: simpy.Container
+    id: int
     
     def get_hunger_rate(self) -> float:
+        ...
+
+    def get_hunt_rate(self) -> float:
         ...
 
     def get_stomach_size(self) -> float:
@@ -21,6 +25,9 @@ class AnimalModel(Entity):
         ...
 
     def get_waste_weight(self) -> float:
+        ...
+
+    def get_feeding_rank(self) -> float:
         ...
 
     def eat(self, feed_weight: float, fcr=1) -> Generator:
