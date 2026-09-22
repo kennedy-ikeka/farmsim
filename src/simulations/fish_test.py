@@ -160,24 +160,24 @@ class TestFish():
         [
             {
                 "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-                "hunt_rate": 0.05,
+                "hunt_rate": 0.5,
                 "rank": 0.35714
             },
             {
                 "fish_params": {"id": 2, "type": "Catfish", "weight": 0.01, "stomach": 10},
-                "hunt_rate": 0.09,
+                "hunt_rate": 0.9,
                 "rank": 0.64286
             }
         ],
         [
             {
                 "fish_params": {"id": 1, "type": "Catfish", "weight": 0.09, "stomach": 90},
-                "hunt_rate": 0.03,
+                "hunt_rate": 0.3,
                 "rank": 0.14286
             },
             {
                 "fish_params": {"id": 2, "type": "Catfish", "weight": 0.04, "stomach": 10},
-                "hunt_rate": 0.18,
+                "hunt_rate": 1.8,
                 "rank": 0.85714
             }
         ],
@@ -201,6 +201,41 @@ class TestFish():
             assert rank == round(f_rank, 5)
 
     @pytest.mark.parametrize("params", [
+        {
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50, "health": 100},
+            "pond_health": 50,
+            "pond_health_effect": 75,
+            "stomach_health_effect": 0.0,
+        },
+        {
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 1, "stomach": 10, "health": 20},
+            "pond_health": 100,
+            "pond_health_effect": 60,
+            "stomach_health_effect": 0.0,
+        },
+        {
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 1, "stomach": 10, "health": 20},
+            "pond_health": 50,
+            "pond_health_effect": 35,
+            "stomach_health_effect": 0.0,
+        }
+    ])
+    def test_fish_health(self, params):
+        fish_params = params['fish_params']
+        pond_health = params['pond_health']
+        pond_health_effect = params['pond_health_effect']
+        stomach_health_effect = params['stomach_health_effect']
+        
+        pond = Pond(env=simpy.Environment(), id=1, type="Concrete_Pond", health=pond_health)
+        fish = Fish(pond=pond, **fish_params)
+
+        fish_pond_health_effect = round(fish.pond_health_effect(), 5)
+        fish_stomach_health_effect = round(fish.stomach_health_effect(), 5)
+
+        assert fish_pond_health_effect == pond_health_effect
+        assert fish_stomach_health_effect == stomach_health_effect        
+    
+    @pytest.mark.parametrize("params", [
         [
             {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
             {"id": 2, "type": "Catfish", "weight": 0.01, "stomach": 10}
@@ -214,7 +249,7 @@ class TestFish():
             {"id": 2, "type": "Catfish", "weight": 0.02, "stomach": 100},
         ]
     ])
-    def test_live(self, params):        
+    def test_existence(self, params):        
         pond = Pond(env=simpy.Environment(), id=1, type="Concrete_Pond")
         for p in params:
             Fish(pond=pond, **p)
@@ -223,7 +258,4 @@ class TestFish():
         fish_1 = pond.get_fish_by_id(1)
         fish_2 = pond.get_fish_by_id(2)
 
-        assert fish_1.weight.level < fish_2.weight.level     
-    
-    def test_die(self):
-        pond = Pond(env=simpy.Environment(), id=1, type="Concrete_Pond")            
+        assert fish_1.weight.level < fish_2.weight.level         

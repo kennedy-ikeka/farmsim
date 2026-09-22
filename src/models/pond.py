@@ -10,22 +10,22 @@ POND_TYPES = Literal[
     "Portable_Pond"
 ]
 
-POND_BASE_COSTS = {
-    "Earthen_Pond": 1500, # Cheapest to construct
-    "Concrete_Pond": 6000, # Very expensive to construct
-    "Portable_Pond": 4000, # Moderatly expenseive to purchase
-}
-
-POND_CONTAMINATION_RATE = {
-    "Earthen_Pond": 0.4,    # 40% relative risk
-    "Concrete_Pond": 0.15,  # 15% relative risk
-    "Portable_Pond": 0.07   # 7% relative risk
-}
-
-POND_SPAWN_FEED_RATE = {
-    "Earthen_Pond": 1.0,   # baseline, rich natural feed
-    "Concrete_Pond": 0.6,  # moderate natural feed
-    "Portable_Pond": 0.2   # very low natural feed
+POND_TYPE_DETAILS = {
+    "Earthen_Pond": {
+        "cost": 1500, # Cheapest to construct
+        "contamination_rate": 0.4,
+        "feed_spawn_rate": 1.0 # baseline, rich natural feed
+    },
+    "Concrete_Pond": {
+        "cost": 6000, # Very expensive to construct
+        "contamination_rate": 0.14,
+        "feed_spawn_rate": 0.6# moderate natural feed
+    },
+    "Portable_Pond": {
+        "cost": 4000, # Moderatly expenseive to purchase
+        "contamination_rate": 0.07,
+        "feed_spawn_rate": 0.2 # very low natural feed
+    }
 }
 
 class PondModel(Entity):

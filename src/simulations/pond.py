@@ -3,11 +3,11 @@ from math import sqrt
 import simpy
 import numpy as np
 
-from src.models.pond import POND_BASE_COSTS, POND_CONTAMINATION_RATE, POND_SPAWN_FEED_RATE, POND_TYPES, PondModel
+from src.models.pond import POND_TYPE_DETAILS, POND_TYPES, PondModel
 
 
 class Pond(PondModel):
-    def __init__(self, env, id: int, type: POND_TYPES, length=1.0, width=1.0, depth=1.0, density = 1.0, rental_rate=0.1, aerated=False, verbose=False):
+    def __init__(self, env, id: int, type: POND_TYPES, length=1.0, width=1.0, depth=1.0, density = 1.0, health=100, rental_rate=0.1, aerated=False, verbose=False):
         super().__init__(env, f"{type}_{id}", verbose=verbose)
         self.id = id
         self.length = length
@@ -20,10 +20,12 @@ class Pond(PondModel):
         self.aerated = aerated
         self.rental_rate = rental_rate
         
-        self.health = simpy.Container(env=env, capacity=100, init=100)
+        self.health = simpy.Container(env=env, capacity=100, init=health)
         self.water = simpy.Container(env=env, capacity=self.volume, init=self.volume)
         self.feed = simpy.Container(env=env, init=0)
         self.fishes = []
+
+        self.pond_details = POND_TYPE_DETAILS[self.type]
 
         # Start the contamination process
         self.contaminate_process = self.env.process(self.contaminate())
@@ -31,13 +33,14 @@ class Pond(PondModel):
         # Start the feed spawning process
         self.spawn_feed_process = self.env.process(self.spawn_feed())
 
+
     def get_feed_availability(self) -> float:
         feed = self.feed.level
         size = sqrt(self.length * self.width)
         return feed / size
 
     def get_cost(self):
-        base_cost = POND_BASE_COSTS[self.type]
+        base_cost = self.pond_details['cost']
         adjustment = 1.0
         if self.aerated:
             adjustment += 0.1 * self.density
@@ -53,9 +56,8 @@ class Pond(PondModel):
             t_spawn = self.rng.exponential(1/4)
             yield self.env.timeout(t_spawn)
 
-            feed_capacity = self.volume * 0.1
-            spawn_rate = POND_SPAWN_FEED_RATE[self.type]
-            feed_weight = spawn_rate * feed_capacity
+            feed_capacity = self.volume * 0.001
+            feed_weight = self.pond_details['feed_spawn_rate'] * feed_capacity
             yield self.feed.put(feed_weight)
             self.log(f"Spawned feed weighing {feed_weight:.2f} units")
 
@@ -81,7 +83,7 @@ class Pond(PondModel):
             t_contaminate = self.rng.exponential(1/6)
             yield self.env.timeout(t_contaminate)
 
-            base_rate = POND_CONTAMINATION_RATE[self.type]/self.volume
+            base_rate = self.pond_details['contamination_rate']/self.volume
             sick_effect = (self.health.capacity / (max(1, self.health.level)))
             contaminate_rate = base_rate * sick_effect
             yield self.health.get(contaminate_rate)

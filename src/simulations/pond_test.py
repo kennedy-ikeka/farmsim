@@ -56,26 +56,33 @@ class TestPond():
     @pytest.mark.parametrize("params", [
         {
             "pond_params": {"type": "Earthen_Pond", "length": 1, "width": 1, "depth": 1},
-            "feed_level": 0.1, 
+            "feed_level": 0.001, 
+            "available_feed": 0.001
         },
         {
             "pond_params": {"type": "Concrete_Pond", "length": 2, "width": 1, "depth": 1},
-            "feed_level": .12, 
+            "feed_level": .0012, 
+            "available_feed": 0.00085
         },
         {
             "pond_params": {"type": "Portable_Pond", "length": 2, "width": 20, "depth": 10},
-            "feed_level": 8, 
+            "feed_level": 0.08, 
+            "available_feed": 0.01265
         },
     ])
     def test_spawn_feed(self, params):
         pond_params = params['pond_params']
         feed_level = params['feed_level']
+        available_feed = params['available_feed']
 
         pond = Pond(env=simpy.Environment(), id=1, **pond_params)
         process = pond.spawn_feed()
         next(process)
         next(process)
-        assert pond.feed.level == feed_level
+        assert round(pond.feed.level, 5) == feed_level
+
+        feed_available = pond.get_feed_availability()
+        assert round(feed_available, 5) == available_feed
 
     @pytest.mark.parametrize("params", [
         {
@@ -84,7 +91,7 @@ class TestPond():
         },
         {
             "pond_params": {"type": "Concrete_Pond", "length": 2, "width": 1, "depth": 1},
-            "health_level": 99.925, 
+            "health_level": 99.93, 
         },
         {
             "pond_params": {"type": "Portable_Pond", "length": 7, "width": 1, "depth": 1},
