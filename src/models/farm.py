@@ -1,34 +1,46 @@
+from dataclasses import field, dataclass
+
 import simpy
 from typing_extensions import Generator, Literal
 
+from models.cycle import Stock
+from models.pond import PondModel
 from src.models.feed import FeedModel
 from src.models.entity import Entity
 
 TRANSACTION_TYPES = Literal["credit", "debit"]
 
+@dataclass
+class FarmBusinessModel:
+    max_biomass_per_m3 = 30
+    stocks: list[Stock] = field(default_factory=list)
+
+
 class FarmModel(Entity):
     money: simpy.Container
     feeds: list[FeedModel]
+    ponds: list[PondModel]
+    stocking_pond: PondModel
     
-    def transact(self, type: TRANSACTION_TYPES, amount, item, quantity=1) -> Generator:
-        ...
-
-    def get_feed_size(self) -> float:
-        ...
-
-    def get_appropriate_feed(self) -> (FeedModel | None):
+    def transact(self, type: TRANSACTION_TYPES, amount: int, item, quantity=1) -> Generator:
         ...
 
     def feed_exists(self, size: float) -> bool:
         ...
         
-    def stock_feed_process(self, feed: FeedModel, weight: float) -> Generator:
+    def stock_feed(self, feed: FeedModel, weight: float) -> Generator:
         ...
 
-    def acquire_pond(self) -> Generator:
+    def get_available_pond(self, volume: float) -> PondModel:
         ...
 
-    def start_cycle(self) -> Generator:
+    def acquire_pond(self, pond: PondModel) -> Generator:
+        ...
+
+    def get_appropriate_pond(self) -> PondModel:
+        ...
+
+    def run_cycles(self) -> Generator:
         ...
 
     

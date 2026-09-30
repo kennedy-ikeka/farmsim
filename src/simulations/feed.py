@@ -1,9 +1,9 @@
 import simpy
 
-from src.models.entity import Entity
 from src.models.feed import FeedModel
+from utils.conversion import to_kobo
 
-class Feed(FeedModel, Entity):
+class Feed(FeedModel):
     def __init__(self, env, name: str, size: float, sinks=False, rate=1, verbose=False):
         super().__init__(env, tag=f"Feed-{name}_{size}", verbose=verbose)
         self.env = env
@@ -19,7 +19,7 @@ class Feed(FeedModel, Entity):
         self.batches = []
 
         # Start the expiry process
-        self.expire_process = self.env.process(self.expire())
+        self.existence = self.env.process(self.exist())
 
     def __str__(self):
         return f"""
@@ -41,7 +41,7 @@ class Feed(FeedModel, Entity):
         gram_rate = (self.rate/self.size) * sink_rate * 10
 
         # Get the cost in kilos
-        return gram_rate * weight * 1000
+        return to_kobo(gram_rate * weight * 1000)
 
     def get_quantity(self):
         """Get the quantity of all feed batches"""
@@ -77,18 +77,22 @@ class Feed(FeedModel, Entity):
 
     def expire(self):
         """Expire feed batches"""       
+        # Checks onces every day
+        yield self.env.timeout(1)
+        self.log("Checking for expired feed batches")
+
+        # Get the feed that are still okay
+        now = self.env.now
+        remaining = list(filter(lambda b: (now - b['time']) <= 90, self.batches))
+
+        # count expired feed and log it
+        expired_count = len(self.batches) - len(remaining)
+        self.log(f"Expired {expired_count} batches.")
+
+        # remove the expired feed
+        self.batches = remaining
+
+    def exist(self):
         while True:
-            # Checks onces every day
-            yield self.env.timeout(1)
-            self.log("Checking for expired feed batches")
-
-            # Get the feed that are still okay
-            now = self.env.now
-            remaining = list(filter(lambda b: (now - b['time']) <= 90, self.batches))
-
-            # count expired feed and log it
-            expired_count = len(self.batches) - len(remaining)
-            self.log(f"Expired {expired_count} batches.")
-
-            # remove the expired feed
-            self.batches = remaining
+            yield self.env.process(self.expire())
+            

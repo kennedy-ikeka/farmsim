@@ -1,7 +1,9 @@
+from typing import Optional
+
 import simpy
 from typing_extensions import Generator, Literal
 
-from src.models.animal import AnimalModel
+from src.models.animal import FishModel
 from src.models.entity import Entity
 
 POND_TYPES = Literal[
@@ -12,34 +14,34 @@ POND_TYPES = Literal[
 
 POND_TYPE_DETAILS = {
     "Earthen_Pond": {
-        "cost": 1500, # Cheapest to construct
+        "cost": 3000, # Cheapest to construct
         "contamination_rate": 0.4,
         "feed_spawn_rate": 1.0 # baseline, rich natural feed
     },
     "Concrete_Pond": {
-        "cost": 6000, # Very expensive to construct
+        "cost": 10000, # Very expensive to construct
         "contamination_rate": 0.14,
         "feed_spawn_rate": 0.6# moderate natural feed
     },
     "Portable_Pond": {
-        "cost": 4000, # Moderatly expenseive to purchase
+        "cost": 6000, # Moderatly expenseive to purchase
         "contamination_rate": 0.07,
         "feed_spawn_rate": 0.2 # very low natural feed
     }
 }
 
 class PondModel(Entity):
-    fishes: list[AnimalModel]
+    fishes: list[FishModel]
     feed: simpy.Container
     health: simpy.Container
+    volume: float
+    since: float
+    duration: int
 
     def get_feed_availability(self) -> float:
         ...
         
-    def get_cost(self) -> float:
-        ...
-
-    def get_rent_cost(self, duration=1) -> float:
+    def get_cost(self, duration: int=0) -> int:
         ...
 
     def spawn_feed(self) -> Generator:

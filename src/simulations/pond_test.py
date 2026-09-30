@@ -27,31 +27,24 @@ class TestPond():
     @pytest.mark.parametrize("params", [
         {
             "pond_params": {"type": "Earthen_Pond", "length": 1, "width": 1, "depth": 1}, 
-            "pond_cost": 1_500, 
-            "pond_rental_cost": 150
+            "pond_cost": 3_000_00, 
         },
         {
             "pond_params": {"type": "Concrete_Pond", "length": 1, "width": 2, "depth": 1}, 
-            "pond_cost": 12_000, 
-            "pond_rental_cost": 1_200
+            "pond_cost": 20_000_00, 
         },
         {
             "pond_params": {"type": "Portable_Pond", "length": 2, "width": 2, "depth": 1}, 
-            "pond_cost": 16_000, 
-            "pond_rental_cost": 1_600
+            "pond_cost": 24_000_00, 
         },
     ])
     def test_pond_cost(self, params):
         pond_params = params['pond_params']
         pond_cost = params['pond_cost']
-        pond_rental_cost = params['pond_rental_cost']
 
         pond = Pond(env=simpy.Environment(), id=1, **pond_params)
         cost = pond.get_cost()
         assert cost == pond_cost
-
-        rental_cost = pond.get_rent_cost()
-        assert rental_cost == pond_rental_cost
 
     @pytest.mark.parametrize("params", [
         {

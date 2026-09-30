@@ -4,11 +4,10 @@ import simpy
 from simulations.fish import Fish
 from simulations.pond import Pond
 
-
 class TestFish():
     @pytest.mark.parametrize("params", [
-        {"id": 1, "type": "Catfish", "weight": 0.01},
-        {"id": 1, "type": "Catfish", "weight": 1},
+        {"id": 1, "type": "Catfish", "weight": 10},
+        {"id": 1, "type": "Catfish", "weight": 1000},
     ])
     def test_create_fish(self, params):
         pond = Pond(env=simpy.Environment(), id=1, type="Concrete_Pond")
@@ -18,7 +17,7 @@ class TestFish():
 
     @pytest.mark.parametrize("params", [
         {},
-        {"id": 1, "weight": 0.01},
+        {"id": 1, "weight": 10},
         {"id": 1, "type": "Catfish"},
     ])
     def test_fail_create_invalid_fish(self, params):
@@ -28,16 +27,16 @@ class TestFish():
 
     @pytest.mark.parametrize("params", [
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
             "hunger_rate": 0.5,
-            "hunger_weight": 0.0005,
-            "waste_weight": 0.0005
+            "hunger_weight": 0.5,
+            "waste_weight": 0.5
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 1, "stomach": 10},
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 1000, "stomach": 10},
             "hunger_rate": 0.9,
-            "hunger_weight": 0.09,
-            "waste_weight": 0.01
+            "hunger_weight": 90,
+            "waste_weight": 10
         }
     ])
     def test_fish_stomach(self, params):
@@ -49,9 +48,9 @@ class TestFish():
         pond = Pond(env=simpy.Environment(), id=1, type="Concrete_Pond")
         fish = Fish(pond=pond, **fish_params)
 
-        fish_hunger_rate = round(fish.get_hunger_rate(), 5)
-        fish_hunger_weight = round(fish.get_hunger_weight(), 5)
-        fish_waste_weight = round(fish.get_waste_weight(), 5)
+        fish_hunger_rate = round(fish.get_hunger_rate(), 2)
+        fish_hunger_weight = round(fish.get_hunger_weight(), 2)
+        fish_waste_weight = round(fish.get_waste_weight(), 2)
 
         assert fish_hunger_rate == hunger_rate
         assert fish_hunger_weight == hunger_weight
@@ -59,39 +58,39 @@ class TestFish():
 
     @pytest.mark.parametrize("params", [
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            "feed_weight": 0.0005,
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            "feed_weight": 0.5,
             "feed_rate": 1,
             "stomach_level": 100,
-            "fish_weight": 0.0105,
+            "fish_weight": 10.5,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            "feed_weight": 0.0001,
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            "feed_weight": 0.1,
             "feed_rate": 1,
             "stomach_level": 60,
-            "fish_weight": 0.0101,
+            "fish_weight": 10.1,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            "feed_weight": 0.0005,
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            "feed_weight": 0.5,
             "feed_rate": 1.2,
             "stomach_level": 100,
-            "fish_weight": 0.01042,
+            "fish_weight": 10.42,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
             "feed_weight": 0,
             "feed_rate": 1,
             "stomach_level": 50,
-            "fish_weight": 0.01,
+            "fish_weight": 10,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            "feed_weight": 0.01,
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            "feed_weight": 1,
             "feed_rate": 1,
             "stomach_level": 100,
-            "fish_weight": 0.0105,
+            "fish_weight": 10.5,
         },
     ])
     def test_eat(self, params):
@@ -110,33 +109,33 @@ class TestFish():
             next(eat_process)
             next(eat_process)
 
-        assert stomach_level == round(fish.stomach.level, 5)
-        assert fish_weight == round(fish.weight.level, 5)
+        assert stomach_level == round(fish.stomach.level, 2)
+        assert fish_weight == round(fish.weight.level, 2)
 
     @pytest.mark.parametrize("params", [
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            "excrete_weight": 0.0005,
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            "excrete_weight": 0.5,
             "stomach_level": 0,
-            "fish_weight": 0.0095,
+            "fish_weight": 9.5,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            "excrete_weight": 0.0001,
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            "excrete_weight": 0.1,
             "stomach_level": 40,
-            "fish_weight": 0.00998,
+            "fish_weight": 9.98,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            "excrete_weight": 0.,
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            "excrete_weight": 0.0,
             "stomach_level": 50,
-            "fish_weight": 0.01,
+            "fish_weight": 10,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            "excrete_weight": 0.01,
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            "excrete_weight": 1,
             "stomach_level": 0,
-            "fish_weight": 0.0095,
+            "fish_weight": 9.5,
         },
     ])
     def test_excrete(self, params):
@@ -159,26 +158,26 @@ class TestFish():
     @pytest.mark.parametrize("params", [
         [
             {
-                "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-                "hunt_rate": 0.5,
-                "rank": 0.35714
+                "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+                "hunt_rate": 1.58,
+                "rank": 0.36
             },
             {
-                "fish_params": {"id": 2, "type": "Catfish", "weight": 0.01, "stomach": 10},
-                "hunt_rate": 0.9,
-                "rank": 0.64286
+                "fish_params": {"id": 2, "type": "Catfish", "weight": 10, "stomach": 10},
+                "hunt_rate": 2.85,
+                "rank": 0.64
             }
         ],
         [
             {
-                "fish_params": {"id": 1, "type": "Catfish", "weight": 0.09, "stomach": 90},
-                "hunt_rate": 0.3,
-                "rank": 0.14286
+                "fish_params": {"id": 1, "type": "Catfish", "weight": 90, "stomach": 90},
+                "hunt_rate": 0.95,
+                "rank": 0.14
             },
             {
-                "fish_params": {"id": 2, "type": "Catfish", "weight": 0.04, "stomach": 10},
-                "hunt_rate": 1.8,
-                "rank": 0.85714
+                "fish_params": {"id": 2, "type": "Catfish", "weight": 40, "stomach": 10},
+                "hunt_rate": 5.69,
+                "rank": 0.86
             }
         ],
     ])
@@ -195,26 +194,26 @@ class TestFish():
             fish = pond.get_fish_by_id(fish_params["id"])
 
             f_hunt_rate = fish.get_hunt_rate()
-            assert hunt_rate == round(f_hunt_rate, 5)
+            assert hunt_rate == round(f_hunt_rate, 2)
 
             f_rank = fish.get_feeding_rank()
-            assert rank == round(f_rank, 5)
+            assert rank == round(f_rank, 2)
 
     @pytest.mark.parametrize("params", [
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50, "health": 100},
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50, "health": 100},
             "pond_health": 50,
             "pond_health_effect": 75,
             "stomach_health_effect": 0.0,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 1, "stomach": 10, "health": 20},
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 1000, "stomach": 10, "health": 20},
             "pond_health": 100,
             "pond_health_effect": 60,
             "stomach_health_effect": 0.0,
         },
         {
-            "fish_params": {"id": 1, "type": "Catfish", "weight": 1, "stomach": 10, "health": 20},
+            "fish_params": {"id": 1, "type": "Catfish", "weight": 1000, "stomach": 10, "health": 20},
             "pond_health": 50,
             "pond_health_effect": 35,
             "stomach_health_effect": 0.0,
@@ -237,16 +236,16 @@ class TestFish():
     
     @pytest.mark.parametrize("params", [
         [
-            {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 50},
-            {"id": 2, "type": "Catfish", "weight": 0.01, "stomach": 10}
+            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            {"id": 2, "type": "Catfish", "weight": 10, "stomach": 10}
         ],
         [
-            {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 0},
-            {"id": 2, "type": "Catfish", "weight": 0.02, "stomach": 50},
+            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 0},
+            {"id": 2, "type": "Catfish", "weight": 20, "stomach": 50},
         ],
         [
-            {"id": 1, "type": "Catfish", "weight": 0.01, "stomach": 0},
-            {"id": 2, "type": "Catfish", "weight": 0.02, "stomach": 100},
+            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 0},
+            {"id": 2, "type": "Catfish", "weight": 20, "stomach": 100},
         ]
     ])
     def test_existence(self, params):        

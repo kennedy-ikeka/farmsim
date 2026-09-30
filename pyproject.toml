@@ -11,10 +11,12 @@ dependencies = [
     "numba>=0.67.0",
     "numpy>=2.5.2",
     "pandas>=3.0.5",
+    "pydantic>=2.13.5",
     "pytest>=9.1.1",
     "scipy>=1.18.1",
     "seaborn>=0.13.2",
     "simpy>=4.1.2",
+    "uuid>=1.30",
 ]
 
 [project.scripts]
@@ -26,6 +28,7 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
 markers = [
     "only: mark test to be run exclusively"
 ]

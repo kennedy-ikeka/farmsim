@@ -3,7 +3,6 @@ import simpy
 
 from src.simulations.feed import Feed
 
-@pytest.mark.only
 class TestFeed:
     @pytest.mark.parametrize("params", [
         {"env": simpy.Environment(), "name": "Random", "size": 1.0},
@@ -68,10 +67,10 @@ class TestFeed:
             assert len(feed.batches) == 1
 
     @pytest.mark.parametrize("params", [
-        {"feed_params": {"size": 1.0}, "weight": 1, "feed_cost": 10000},
-        {"feed_params": {"size": 0.8}, "weight": 1, "feed_cost": 12500},
-        {"feed_params": {"size": 1, "sinks": True}, "weight": 1, "feed_cost": 8000},
-        {"feed_params": {"size": 1, "rate": .8}, "weight": 1, "feed_cost": 8000}
+        {"feed_params": {"size": 1.0}, "weight": 1, "feed_cost": 10000_00},
+        {"feed_params": {"size": 0.8}, "weight": 1, "feed_cost": 12500_00},
+        {"feed_params": {"size": 1, "sinks": True}, "weight": 1, "feed_cost": 8000_00},
+        {"feed_params": {"size": 1, "rate": .8}, "weight": 1, "feed_cost": 8000_00}
     ])
     def test_feed_cost(self, params):
         feed_params = params['feed_params']

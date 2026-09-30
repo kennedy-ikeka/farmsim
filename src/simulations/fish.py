@@ -1,14 +1,16 @@
+from typing_extensions import Optional
+
 import simpy
 import numpy as np
 from math import sqrt
 
-from src.models.animal import ANIMAL_TYPE, AnimalModel
+from src.models.animal import FISH_TYPES, FishModel
 from src.models.pond import PondModel
 
-class Fish(AnimalModel):
+class Fish(FishModel):
     """A fish entity in the the simulation"""
 
-    def __init__(self, pond: PondModel, id: int, type: ANIMAL_TYPE, weight: float, stomach=100, health=100, verbose=False, seed=0):
+    def __init__(self, pond: PondModel, id: int, type: FISH_TYPES, weight: float, stock_id: Optional[str] = None, batch_id: Optional[str] = None, stomach=100, health=100, verbose=False, seed=0):
         super().__init__(pond.env, tag=f"{type}_{id}", verbose=verbose, seed=seed)
         self.pond = pond
         self.type = type
@@ -16,13 +18,10 @@ class Fish(AnimalModel):
         self.weight = simpy.Container(pond.env, init=weight)
         self.stomach = simpy.Container(pond.env, capacity=100, init=stomach)
         self.health = simpy.Container(pond.env, capacity=100, init=health)
-
-        self.data = {
-            "feeding": [],
-            "excretion": []
-        }
+        self.stock_id = stock_id
+        self.batch_id = batch_id
         
-        self.exist_process = self.env.process(self.exist())
+        self.existence = self.env.process(self.exist())
         self.pond.fishes.append(self)
 
     def __str__(self):
@@ -35,6 +34,10 @@ class Fish(AnimalModel):
         hunger_rate: {self.get_hunger_rate()},
         """
 
+    def get_stomach_size(self):
+        """Get the stomach size with respect to the weight"""
+        return self.weight.level * 0.1
+
     def get_hunger_rate(self):
         """Get the stomach level of the fish"""
         empty_stomach = self.stomach.capacity - self.stomach.level
@@ -42,22 +45,15 @@ class Fish(AnimalModel):
 
     def get_hunt_rate(self):
         """Get the hunt rate of the fish"""
-        return self.get_hunger_rate() * sqrt(self.weight.level * self.health.level)
+        health_state = self.health.level / self.health.capacity
+        return self.get_hunger_rate() * sqrt(self.weight.level) * health_state
 
     def get_feeding_rank(self) -> float:
-        rates = sum(
-            f.get_hunt_rate() 
-            for f in self.pond.fishes
-        )
+        rates = sum(f.get_hunt_rate() for f in self.pond.fishes)
         if rates == 0:
             return 0
-        
         hunt_rate = self.get_hunt_rate()
         return hunt_rate / rates
-
-    def get_stomach_size(self):
-        """Get the stomach size with respect to the weight"""
-        return self.weight.level * 0.1
 
     def get_hunger_weight(self):
         """Get the maximum weight of feed it can consume at the moment"""
@@ -92,14 +88,15 @@ class Fish(AnimalModel):
         yield self.weight.put(weight_gained) # Gain weight
         self.log(f"Gained weight by ({(weight_gained * 100)/self.weight.level:.2f}% )")
 
-        self.data["feeding"].append({ 
-            "time": self.env.now, 
+        self.metric("feeding", { 
             "id": self.id,
-            "hunger_level": hunger_level,
-            "hunger_weight": hunger_weight,
-            "feed_weight": can_eat, 
-            "quench_level": quench_level,
-            "stomach_level": self.stomach.level
+            "hunger_level": round(hunger_level, 5),
+            "hunger_weight": round(hunger_weight, 5),
+            "feed_weight": round(can_eat, 5), 
+            "quench_level": round(quench_level, 5),
+            "stomach_level": round(self.stomach.level, 5),
+            "stock_id": self.stock_id,
+            "batch_id": self.batch_id
         })
 
     def excrete(self, excrete_weight):
@@ -151,7 +148,8 @@ class Fish(AnimalModel):
     def get_starving_rate(self):
         starving_rate = 0
         if self.stomach.level <= 1:
-            last_feed_at = self.data['feeding'][-1]['time'] if len(self.data['feeding']) else 0
+            feeding_history = self.tables.get('feeding', [])
+            last_feed_at = feeding_history[-1]['time'] if len(feeding_history) else 0
             starving_rate = self.env.now - last_feed_at
         return starving_rate
 
@@ -191,4 +189,7 @@ class Fish(AnimalModel):
             yield self.env.process(self.hunt()) # hunt for feed
             yield self.env.process(self.digest()) # excrete waste
             yield self.env.process(self.health_check())
+
+    def set_pond(self, pond: PondModel):
+        self.pond = pond
             
