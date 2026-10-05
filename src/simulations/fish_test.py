@@ -258,3 +258,4 @@ class TestFish():
         fish_2 = pond.get_fish_by_id(2)
 
         assert fish_1.weight.level < fish_2.weight.level         
+        

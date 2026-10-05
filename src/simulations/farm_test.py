@@ -2,7 +2,7 @@ import pytest
 import simpy
 
 from models.cycle import Phase, Stock
-from models.farm import FarmBusinessModel
+from models.farm import FarmingModel
 from models.pond import PondModel
 from simulations.farm import Farm
 from simulations.feed import Feed
@@ -159,7 +159,7 @@ class TestFarm():
 
     @pytest.mark.parametrize("params", [
         {
-            "business_model": FarmBusinessModel(
+            "farming_model": FarmingModel(
                 stocks=[
                     Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
                 ]
@@ -171,7 +171,7 @@ class TestFarm():
             "balance": 90_000_00
         },
         {
-            "business_model": FarmBusinessModel(
+            "farming_model": FarmingModel(
                 stocks=[
                     Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
                 ]
@@ -183,7 +183,7 @@ class TestFarm():
             "balance": 90_000_00
         },
         {
-            "business_model": FarmBusinessModel(
+            "farming_model": FarmingModel(
                 stocks=[
                     Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")]),
                     Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
@@ -196,7 +196,7 @@ class TestFarm():
             "balance": 90_000_00
         },
         {
-            "business_model": FarmBusinessModel(
+            "farming_model": FarmingModel(
                 stocks=[
                     Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")], gap=0),
                     Stock("Catfish", 20, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
@@ -209,9 +209,8 @@ class TestFarm():
             "balance": 90_000_00
         },
     ])
-    @pytest.mark.only
     def test_run_cycles(self, params):
-        business_model = params['business_model']
+        farming_model = params['farming_model']
         money = params['money']
         until = params['until']
         n_cycles = params['n_cycles']
@@ -219,7 +218,7 @@ class TestFarm():
         balance = params['balance']
 
         env = simpy.Environment()
-        farm = Farm(env, "Random", money, ponds=[], feeds=[], business_model=business_model)
+        farm = Farm(env, "Random", money, ponds=[], feeds=[], farming_model=farming_model)
 
         env.process(farm.exist())
         env.run(until)

@@ -11,16 +11,23 @@ from src.models.entity import Entity
 TRANSACTION_TYPES = Literal["credit", "debit"]
 
 @dataclass
-class FarmBusinessModel:
+class FarmingModel:
     max_biomass_per_m3 = 30
     stocks: list[Stock] = field(default_factory=list)
+    feeding_hours = [7, 19]
+    pond_contamination_limit = 0.5
 
+@dataclass
+class BusinessModel:
+    ...
 
 class FarmModel(Entity):
     money: simpy.Container
     feeds: list[FeedModel]
     ponds: list[PondModel]
     stocking_pond: PondModel
+    farming_model: FarmingModel
+    business_model: BusinessModel
     
     def transact(self, type: TRANSACTION_TYPES, amount: int, item, quantity=1) -> Generator:
         ...

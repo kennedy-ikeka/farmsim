@@ -6,18 +6,19 @@ from models.cycle import CycleModel, Stock
 from models.feed import FeedModel
 from simulations.pond import Pond
 from src.models.pond import PondModel
-from src.models.farm import FarmBusinessModel, FarmModel
+from src.models.farm import BusinessModel, FarmingModel, FarmModel
 from simulations.cycle import Cycle
 from utils.conversion import to_kilo
 
 class Farm(FarmModel):
-    def __init__(self, env, name, money, business_model = FarmBusinessModel(), ponds: list[PondModel]=[], feeds: list[FeedModel]=[], verbose=False):
+    def __init__(self, env, name, money, farming_model = FarmingModel(), business_model = BusinessModel(), ponds: list[PondModel]=[], feeds: list[FeedModel]=[], verbose=False):
         super().__init__(env, name, verbose)
         self.name = name
         self.ponds = ponds
         self.feeds = feeds
         self.money = simpy.Container(env, init=money) # in kobo
         self.cycles: list[CycleModel] = []
+        self.farming_model = farming_model
         self.business_model = business_model
 
         self.t_next_cycle = 0
@@ -32,7 +33,7 @@ class Farm(FarmModel):
         else:
             yield self.money.put(amount)
 
-        self.metric("transact", {
+        self.metric("transactions", {
             'time': self.env.now,
             'action': action,
             'amount': amount,
@@ -81,7 +82,7 @@ class Farm(FarmModel):
 
     def generate_appropriate_pond(self, target_weight: int, count: int, duration: int) -> PondModel:
         reqiured_biomass = to_kilo(target_weight * count)
-        required_volume = reqiured_biomass / self.business_model.max_biomass_per_m3
+        required_volume = reqiured_biomass / self.farming_model.max_biomass_per_m3
         dimension = required_volume ** (1/3)
         return Pond(env=self.env, id=len(self.ponds), type="Earthen_Pond", length=dimension, width=dimension, depth=dimension, duration=duration)
 
@@ -125,7 +126,7 @@ class Farm(FarmModel):
         """Initiate the next cycle"""        
         # Get the stock for the cycle
         yield self.env.timeout(self.t_next_cycle)
-        stock = self.business_model.stocks[0]
+        stock = self.farming_model.stocks[0]
 
         # Get the previous cycles for next cycle id generation
         same_stock_cycles = list(filter(lambda x: x.stock.type == stock.type, self.cycles))
@@ -137,7 +138,7 @@ class Farm(FarmModel):
         self.cycles.append(cycle)
 
         # move the stock to the buttom of the stock queue
-        self.business_model.stocks = self.business_model.stocks[1:] + self.business_model.stocks[:1]
+        self.farming_model.stocks = self.farming_model.stocks[1:] + self.farming_model.stocks[:1]
 
         # set the next time for next cycle to start
         self.t_next_cycle = stock.gap if stock.gap != None else stock.duration
