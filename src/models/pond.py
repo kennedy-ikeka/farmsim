@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional
 
 import simpy
@@ -12,23 +13,20 @@ POND_TYPES = Literal[
     "Portable_Pond"
 ]
 
+@dataclass
+class PondDetail:
+    cost: int # cost of 1 cubic meter or 1000 liters
+    contamination_rate: float # rate at which pond gets dirty
+    feed_spawn_rate: float # rate at which naturally occuring feed grows in the pond
+    seepage: bool # rate at which rain enters or leaves the pond depending on the weather
+
 POND_TYPE_DETAILS = {
-    "Earthen_Pond": {
-        "cost": 3000, # Cheapest to construct
-        "contamination_rate": 0.4,
-        "feed_spawn_rate": 1.0 # baseline, rich natural feed
-    },
-    "Concrete_Pond": {
-        "cost": 10000, # Very expensive to construct
-        "contamination_rate": 0.14,
-        "feed_spawn_rate": 0.6# moderate natural feed
-    },
-    "Portable_Pond": {
-        "cost": 6000, # Moderatly expenseive to purchase
-        "contamination_rate": 0.07,
-        "feed_spawn_rate": 0.2 # very low natural feed
-    }
+    "Earthen_Pond": PondDetail(30000_00, .4, 1, True),
+    "Concrete_Pond": PondDetail(150000_00, .14, .6, False),
+    "Portable_Pond": PondDetail(60000_00, .07, .2, False)
 }
+
+POND_RENTAL_INTERVAL = 30
 
 class PondModel(Entity):
     fishes: list[FishModel]

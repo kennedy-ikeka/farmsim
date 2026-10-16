@@ -2,7 +2,6 @@ import pytest
 import simpy
 import numpy as np
 
-from models.cycle import Phase, Stock
 from models.feed import FeedModel
 from simulations.batch import Batch
 from simulations.farm import Farm
@@ -10,11 +9,10 @@ from simulations.feed import Feed
 from simulations.fish import Fish
 from simulations.pond import Pond
 
-
 class TestBatch:
     @pytest.mark.parametrize("params", [
-        {"duration": 1, "stock_id": "Catfish_0"},
-        {"duration": 10, "stock_id": "Catfish_10"},
+        {"duration": 1, "cycle_id": 0},
+        {"duration": 10, "cycle_id": 10},
     ])
     def test_create_batch(self, params):
         env = simpy.Environment()
@@ -22,15 +20,15 @@ class TestBatch:
         farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=[])
         fish = Fish(pond, 1, "Catfish", 40)
 
-        batch = Batch(farm, pond, [fish], **params)
-        assert batch.tag == f"{pond.tag}_{params['stock_id']}"
+        batch = Batch(1, farm, pond, [fish], **params)
+        assert batch.tag == "Batch_1"
         assert batch.active == True
         assert batch.duration == params['duration']
 
     @pytest.mark.parametrize("params", [
         {},
         {"duration": 1},
-        {"duration": 0, "stock_id": "Catfish_0"},
+        {"duration": 0, "cycle_id": 0},
     ])
     def test_fail_create_invalid_batch(self, params):
         with pytest.raises(TypeError):
@@ -38,17 +36,17 @@ class TestBatch:
 
     @pytest.mark.parametrize("params", [
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "until": 1,
             "t_next_feeding": 7
         },
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "until": 1.5,
             "t_next_feeding": 7
         },
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "until": 1.875,
             "t_next_feeding": 10
         }
@@ -60,10 +58,10 @@ class TestBatch:
 
         env = simpy.Environment()
         pond = Pond(env=env, id=1, type="Portable_Pond")
-        farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=[])
+        farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=[], active=False)
         fish = Fish(pond, 1, "Catfish", 40)
 
-        batch = Batch(farm, pond, [fish], **batch_params)
+        batch = Batch(1, farm, pond, [fish], **batch_params)
         batch.run(until)
 
         n_feeding_time = round(batch.get_next_feeding_time() * 24)
@@ -71,17 +69,17 @@ class TestBatch:
 
     @pytest.mark.parametrize("params", [
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "fish_size": 40,
             "feed_size": 1.5
         },
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "fish_size": 99,
             "feed_size": 2
         },
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "fish_size": 2100,
             "feed_size": 6
         },
@@ -96,25 +94,25 @@ class TestBatch:
         farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=[])
         fish = Fish(pond, 1, "Catfish", fish_size)
 
-        batch = Batch(farm, pond, [fish], **batch_params)
+        batch = Batch(1,farm, pond, [fish], **batch_params)
         batch_feed_size = batch.get_feed_size()
         assert batch_feed_size == feed_size
 
     @pytest.mark.parametrize("params", [
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "fish_size": 40,
             "feeds_params": [],
             "available_feed": False
         },
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "fish_size": 40,
             "feeds_params": [{"name": "Random", "size": 1.5}],
             "available_feed": True
         },
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "fish_size": 40,
             "feeds_params": [{"name": "Random", "size": 6}],
             "available_feed": False
@@ -132,18 +130,18 @@ class TestBatch:
         farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=feeds)
         fish = Fish(pond, 1, "Catfish", fish_size)
 
-        batch = Batch(farm, pond, [fish], **batch_params)
+        batch = Batch(1, farm, pond, [fish], **batch_params)
         batch_feed = batch.get_feed()
         assert (batch_feed is not None) == available_feed
 
     @pytest.mark.parametrize("params", [
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "t_next_feeding": .1,
             "fish_size": 40,
         },
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "t_next_feeding": .3,
             "fish_size": 40,
         },
@@ -156,7 +154,7 @@ class TestBatch:
         env = simpy.Environment()
         pond = Pond(env=env, id=1, type="Portable_Pond")
         feed = Feed(env=env, name="Random", size=1)
-        farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=[feed])
+        farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=[feed], active=False)
         fish = Fish(pond, 1, "Catfish", fish_size)
 
         called = {"stocked_feed": 0, "consumed_feed": 0}
@@ -170,7 +168,7 @@ class TestBatch:
                 yield env.timeout(0)
         monkeypatch.setattr(Feed, "consume", fake_feed_consume)
 
-        batch = Batch(farm, pond, [fish], **batch_params)
+        batch = Batch(1, farm, pond, [fish], **batch_params)
         batch.t_next_feeding = t_next_feeding
         env.process(batch.feed_fishes())
         env.run(until=batch.t_next_feeding + 1)
@@ -180,13 +178,13 @@ class TestBatch:
 
     @pytest.mark.parametrize("params", [
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 1, "cycle_id": 0},
             "pond_health": 40,
             "decontamination_called": True
         },
         {
-            "batch_params": {"duration": 1, "stock_id": "Catfish_0"},
-            "pond_health": 60,
+            "batch_params": {"duration": 1, "cycle_id": 0},
+            "pond_health": 90,
             "decontamination_called": False
         },
     ])
@@ -197,7 +195,7 @@ class TestBatch:
 
         env = simpy.Environment()
         pond = Pond(env=env, id=1, type="Portable_Pond", health=pond_health)
-        farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=[])
+        farm = Farm(env, "Random", money=100_000_00, ponds=[pond], feeds=[], active=False)
         fish = Fish(pond, 1, "Catfish", 40)
 
         called = {"decontaminated": False}
@@ -206,21 +204,20 @@ class TestBatch:
             yield env.timeout(0)
         monkeypatch.setattr(Pond, "decontaminate", fake_decontamination)
 
-        batch = Batch(farm, pond, [fish], **batch_params)
-        env.process(batch.maintain_pond())
-        env.run(until=1)
+        batch = Batch(1, farm, pond, [fish], **batch_params)
+        batch.run(until=2)
 
         assert called["decontaminated"] == decontamination_called
 
     @pytest.mark.parametrize("params", [
         {
-            "batch_params": {"duration": 10, "stock_id": "Catfish_0"},
-            "until": 100,
+            "batch_params": {"duration": 10, "cycle_id": 0},
+            "until": 20,
             "fish_size": 40,
             "active": False
         },
         {
-            "batch_params": {"duration": 100, "stock_id": "Catfish_0"},
+            "batch_params": {"duration": 100, "cycle_id": 0},
             "until": 10,
             "fish_size": 40,
             "active": True
@@ -234,11 +231,11 @@ class TestBatch:
 
         env = simpy.Environment()
         pond = Pond(env=env, id=1, type="Portable_Pond")
-        farm = Farm(env, "Random", 100_000_00, ponds=[pond], feeds=[])
-        fish = Fish(pond, 1, "Catfish", fish_size)
+        farm = Farm(env, "Random", money=1_000_000_00, ponds=[pond], feeds=[], active=False)
+        fishes: list = [Fish(pond, 1, "Catfish", fish_size) for _ in range(10)]
 
-        batch = Batch(farm, pond, [fish], **batch_params)
-        batch.run(until)
+        batch = Batch(1, farm, pond, fishes, **batch_params)
+        env.run(until)
 
         median_fish_size = np.median([f.weight.level for f in batch.fishes])
         assert median_fish_size > fish_size

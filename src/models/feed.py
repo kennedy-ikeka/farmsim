@@ -16,7 +16,7 @@ class FeedModel(Entity):
     def expire(self) -> Generator:
         ...
 
-    def get_cost(self, weight: float) -> int:
+    def get_cost(self, weight: int) -> int:
         ...
 
     def get_quantity(self) -> int:
@@ -25,5 +25,5 @@ class FeedModel(Entity):
     def consume(self, weight: float) -> Generator: 
         ...
 
-    def refill(self, weight: float):
+    def refill(self, weight: int):
         ...        

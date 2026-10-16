@@ -26,17 +26,42 @@ class TestFish():
             Fish(pond=pond, **params)
 
     @pytest.mark.parametrize("params", [
+        [
+            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
+            {"id": 2, "type": "Catfish", "weight": 10, "stomach": 10}
+        ],
+        [
+            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 0},
+            {"id": 2, "type": "Catfish", "weight": 20, "stomach": 50},
+        ],
+        [
+            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 0},
+            {"id": 2, "type": "Catfish", "weight": 20, "stomach": 100},
+        ]
+    ])
+    def test_existence(self, params):        
+        pond = Pond(env=simpy.Environment(), id=1, type="Concrete_Pond")
+        for p in params:
+            Fish(pond=pond, **p)
+
+        pond.env.run(1)
+        fish_1 = pond.get_fish_by_id(1)
+        fish_2 = pond.get_fish_by_id(2)
+
+        assert fish_1.weight.level < fish_2.weight.level         
+
+    @pytest.mark.parametrize("params", [
         {
             "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
             "hunger_rate": 0.5,
-            "hunger_weight": 0.5,
-            "waste_weight": 0.5
+            "hunger_weight": 0.2,
+            "waste_weight": 0.2
         },
         {
             "fish_params": {"id": 1, "type": "Catfish", "weight": 1000, "stomach": 10},
             "hunger_rate": 0.9,
-            "hunger_weight": 90,
-            "waste_weight": 10
+            "hunger_weight": 9,
+            "waste_weight": 1
         }
     ])
     def test_fish_stomach(self, params):
@@ -62,13 +87,13 @@ class TestFish():
             "feed_weight": 0.5,
             "feed_rate": 1,
             "stomach_level": 100,
-            "fish_weight": 10.5,
+            "fish_weight": 10.2,
         },
         {
             "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
             "feed_weight": 0.1,
             "feed_rate": 1,
-            "stomach_level": 60,
+            "stomach_level": 75,
             "fish_weight": 10.1,
         },
         {
@@ -76,7 +101,7 @@ class TestFish():
             "feed_weight": 0.5,
             "feed_rate": 1.2,
             "stomach_level": 100,
-            "fish_weight": 10.42,
+            "fish_weight": 10.17,
         },
         {
             "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
@@ -90,7 +115,7 @@ class TestFish():
             "feed_weight": 1,
             "feed_rate": 1,
             "stomach_level": 100,
-            "fish_weight": 10.5,
+            "fish_weight": 10.2,
         },
     ])
     def test_eat(self, params):
@@ -117,13 +142,13 @@ class TestFish():
             "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
             "excrete_weight": 0.5,
             "stomach_level": 0,
-            "fish_weight": 9.5,
+            "fish_weight": 9.998,
         },
         {
             "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
             "excrete_weight": 0.1,
-            "stomach_level": 40,
-            "fish_weight": 9.98,
+            "stomach_level": 25,
+            "fish_weight": 9.9995,
         },
         {
             "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
@@ -135,7 +160,7 @@ class TestFish():
             "fish_params": {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
             "excrete_weight": 1,
             "stomach_level": 0,
-            "fish_weight": 9.5,
+            "fish_weight": 9.998,
         },
     ])
     def test_excrete(self, params):
@@ -234,28 +259,3 @@ class TestFish():
         assert fish_pond_health_effect == pond_health_effect
         assert fish_stomach_health_effect == stomach_health_effect        
     
-    @pytest.mark.parametrize("params", [
-        [
-            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 50},
-            {"id": 2, "type": "Catfish", "weight": 10, "stomach": 10}
-        ],
-        [
-            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 0},
-            {"id": 2, "type": "Catfish", "weight": 20, "stomach": 50},
-        ],
-        [
-            {"id": 1, "type": "Catfish", "weight": 10, "stomach": 0},
-            {"id": 2, "type": "Catfish", "weight": 20, "stomach": 100},
-        ]
-    ])
-    def test_existence(self, params):        
-        pond = Pond(env=simpy.Environment(), id=1, type="Concrete_Pond")
-        for p in params:
-            Fish(pond=pond, **p)
-
-        pond.env.run(1)
-        fish_1 = pond.get_fish_by_id(1)
-        fish_2 = pond.get_fish_by_id(2)
-
-        assert fish_1.weight.level < fish_2.weight.level         
-        

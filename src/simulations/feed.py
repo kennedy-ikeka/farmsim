@@ -4,8 +4,8 @@ from src.models.feed import FeedModel
 from utils.conversion import to_kobo
 
 class Feed(FeedModel):
-    def __init__(self, env, name: str, size: float, sinks=False, rate=1, verbose=False):
-        super().__init__(env, tag=f"Feed-{name}_{size}", verbose=verbose)
+    def __init__(self, env, name: str, size: float, sinks=False, rate=1.0, verbose=0, seed=0):
+        super().__init__(env, type="Feed", id=0, verbose=verbose, seed=seed)
         self.env = env
         self.name = name
         self.size = size
@@ -31,7 +31,7 @@ class Feed(FeedModel):
             quantity: {self.get_quantity()}
         """       
 
-    def get_cost(self, weight: float):
+    def get_cost(self, weight: int):
         """Get the cost of weight of feed"""
 
         # Floatable feed are more expensive
@@ -40,8 +40,8 @@ class Feed(FeedModel):
         # Get the cost of a gram of the feed
         gram_rate = (self.rate/self.size) * sink_rate * 10
 
-        # Get the cost in kilos
-        return to_kobo(gram_rate * weight * 1000)
+        # Get the cost
+        return to_kobo(gram_rate * weight)
 
     def get_quantity(self):
         """Get the quantity of all feed batches"""
@@ -54,16 +54,17 @@ class Feed(FeedModel):
         for b in self.batches: # Take starting from the earliest batch
             stock: simpy.Container = b['stock']
             take = weight if stock.level >= weight else stock.level
-            yield stock.get(take) # Update batch
-            
-            counter += take  # Update the counter and weight
-            weight -= counter         
+            if take > 0:
+                yield stock.get(take) # Update batch
+                counter += take  # Update the counter and weight
+                weight -= int(counter)      
+                   
             if weight == 0: # Exit loop when the required weight is taken
                 break
 
         # Remove the empty batches                
         self.batches = [b for b in self.batches if b['stock'].level > 0]
-        self.log(f"Took {counter} from stock")
+        self.info(f"Took {counter} from stock")
 
     def refill(self, weight: float):
         """Add a new batch to the feed"""
@@ -78,21 +79,24 @@ class Feed(FeedModel):
     def expire(self):
         """Expire feed batches"""       
         # Checks onces every day
-        yield self.env.timeout(1)
-        self.log("Checking for expired feed batches")
+        while self.active:
+            yield self.env.timeout(1)
+            self.info("Checking for expired feed batches")
 
-        # Get the feed that are still okay
-        now = self.env.now
-        remaining = list(filter(lambda b: (now - b['time']) <= 90, self.batches))
+            # Get the feed that are still okay
+            now = self.env.now
+            remaining = list(filter(lambda b: (now - b['time']) <= 90, self.batches))
 
-        # count expired feed and log it
-        expired_count = len(self.batches) - len(remaining)
-        self.log(f"Expired {expired_count} batches.")
+            # count expired feed and log it
+            expired_count = len(self.batches) - len(remaining)
+            self.info(f"Expired {expired_count} batches.")
 
-        # remove the expired feed
-        self.batches = remaining
+            # remove the expired feed
+            self.batches = remaining
 
     def exist(self):
-        while True:
-            yield self.env.process(self.expire())
-            
+        yield self.env.timeout(0)
+
+        if self.active:
+            # Start the expiry process
+            self.expire_process = self.env.process(self.expire())

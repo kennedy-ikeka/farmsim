@@ -3,7 +3,6 @@ import simpy
 
 from src.simulations.pond import Pond
 
-
 class TestPond():
     @pytest.mark.parametrize("params", [
         {"env": simpy.Environment(), "id": 1, "type": "Earthen_Pond"},
@@ -26,16 +25,49 @@ class TestPond():
 
     @pytest.mark.parametrize("params", [
         {
+            "pond_params": {"type": "Earthen_Pond", "length": 1, "width": 1, "depth": 1},
+            "health_level": 96.34, 
+            "feed_level": 9, 
+            "until": 10
+        },
+        {
+            "pond_params": {"type": "Concrete_Pond", "length": 2, "width": 1, "depth": 1},
+            "health_level": 99.37,
+            "feed_level": 10.8, 
+            "until": 10
+        },
+        {
+            "pond_params": {"type": "Portable_Pond", "length": 2, "width": 20, "depth": 10},
+            "health_level": 99.98,
+            "feed_level": 7920, 
+            "until": 100
+        },
+    ])
+    def test_pond_existence(self, params):
+        pond_params = params['pond_params']
+        feed_level = params['feed_level']
+        health_level = params['health_level']
+        until = params['until']
+
+        env = simpy.Environment()
+        pond = Pond(env, id=1, **pond_params)
+        pond.run(until)
+
+        assert round(pond.health.level, 2) == health_level
+        assert round(pond.feed.level, 2) == feed_level
+
+    @pytest.mark.parametrize("params", [
+        {
             "pond_params": {"type": "Earthen_Pond", "length": 1, "width": 1, "depth": 1}, 
-            "pond_cost": 3_000_00, 
+            "pond_cost": 30_000_00, 
         },
         {
             "pond_params": {"type": "Concrete_Pond", "length": 1, "width": 2, "depth": 1}, 
-            "pond_cost": 20_000_00, 
+            "pond_cost": 300_000_00, 
         },
         {
             "pond_params": {"type": "Portable_Pond", "length": 2, "width": 2, "depth": 1}, 
-            "pond_cost": 24_000_00, 
+            "pond_cost": 240_000_00, 
         },
     ])
     def test_pond_cost(self, params):
@@ -49,57 +81,62 @@ class TestPond():
     @pytest.mark.parametrize("params", [
         {
             "pond_params": {"type": "Earthen_Pond", "length": 1, "width": 1, "depth": 1},
-            "feed_level": 0.001, 
-            "available_feed": 0.001
+            "feed_level": 9, 
+            "until": 10
         },
         {
             "pond_params": {"type": "Concrete_Pond", "length": 2, "width": 1, "depth": 1},
-            "feed_level": .0012, 
-            "available_feed": 0.00085
+            "feed_level": 10.8, 
+            "until": 10
         },
         {
             "pond_params": {"type": "Portable_Pond", "length": 2, "width": 20, "depth": 10},
-            "feed_level": 0.08, 
-            "available_feed": 0.01265
+            "feed_level": 720, 
+            "until": 10
         },
     ])
     def test_spawn_feed(self, params):
         pond_params = params['pond_params']
         feed_level = params['feed_level']
-        available_feed = params['available_feed']
+        until = params['until']
 
-        pond = Pond(env=simpy.Environment(), id=1, **pond_params)
-        process = pond.spawn_feed()
-        next(process)
-        next(process)
+        env = simpy.Environment()
+        pond = Pond(env, id=1, **pond_params)
+        pond.run(until)
         assert round(pond.feed.level, 5) == feed_level
-
-        feed_available = pond.get_feed_availability()
-        assert round(feed_available, 5) == available_feed
 
     @pytest.mark.parametrize("params", [
         {
             "pond_params": {"type": "Earthen_Pond", "length": 1, "width": 1, "depth": 1},
             "health_level": 99.6, 
+            "until": 2
+        },
+        {
+            "pond_params": {"type": "Earthen_Pond", "length": 1, "width": 1, "depth": 1},
+            "health_level": 96.34, 
+            "until": 10
         },
         {
             "pond_params": {"type": "Concrete_Pond", "length": 2, "width": 1, "depth": 1},
-            "health_level": 99.93, 
+            "health_level": 99.37, 
+            "until": 10
         },
         {
             "pond_params": {"type": "Portable_Pond", "length": 7, "width": 1, "depth": 1},
-            "health_level": 99.99, 
+            "health_level": 99.91, 
+            "until": 10
         },
     ])
     def test_contaminate_pond(self, params):
         pond_params = params['pond_params']
         health_level = params['health_level']
+        until = params['until']
 
-        pond = Pond(env=simpy.Environment(), id=1, **pond_params)
-        process = pond.contaminate()
-        next(process)
-        next(process)
-        assert pond.health.level == health_level
+        env = simpy.Environment()
+        pond = Pond(env, id=1, **pond_params)
+        pond.run(until)
+
+        assert round(pond.health.level, 2) == health_level
 
     @pytest.mark.parametrize("params", [
         {
@@ -121,7 +158,7 @@ class TestPond():
 
         env=simpy.Environment()
         pond = Pond(env=env, id=1, **pond_params)
-        env.run(until=until)
+        pond.run(until=until)
 
         health = pond.health.level
         assert pond.health.level < 100

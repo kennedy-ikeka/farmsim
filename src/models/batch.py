@@ -1,5 +1,6 @@
 from typing_extensions import Generator
 
+from models.animal import FishModel
 from models.entity import Entity
 from models.feed import FeedModel
 from models.pond import PondModel
@@ -9,9 +10,7 @@ class BatchModel(Entity):
     active: bool
     duration: int
     pond: PondModel
-
-    def get_age(self) -> int:
-        ...
+    fishes: list[FishModel]
 
     def next_feeding_time(self) -> float:
         ...

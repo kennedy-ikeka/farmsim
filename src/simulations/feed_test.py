@@ -23,10 +23,35 @@ class TestFeed:
             Feed(**params)
 
     @pytest.mark.parametrize("params", [
+        {"refill": 10, "consume": 10, "until": 10, "left": 0},
+        {"refill": 10, "consume": 5, "until": 10, "left": 5},
+        {"refill": 10, "consume": 15, "until": 10, "left": 0},
+        {"refill": 10, "consume": 0, "until": 10, "left": 10},
+        {"refill": 10, "consume": 5, "until": 100, "left": 0},
+    ])
+    def test_feed_existence(self, params):
+        refill = params['refill']
+        consume = params['consume']
+        until = params['until']
+        left = params['left']
+
+        env = simpy.Environment()
+        feed = Feed(env, name="Random", size=1.0)   
+
+        feed.refill(refill)
+        env.process(feed.consume(consume))
+        env.run(until=until)
+
+        q = feed.get_quantity()
+        assert q == left
+
+
+    @pytest.mark.parametrize("params", [
         [10],
         [10, 10],
+        [10, 10000],
     ])
-    def test_refiil_feed(self, params):
+    def test_refill_feed(self, params):
         feed = Feed(env=simpy.Environment(), name="Random", size=1.0)       
         for i in params:
             feed.refill(i)
@@ -67,10 +92,10 @@ class TestFeed:
             assert len(feed.batches) == 1
 
     @pytest.mark.parametrize("params", [
-        {"feed_params": {"size": 1.0}, "weight": 1, "feed_cost": 10000_00},
-        {"feed_params": {"size": 0.8}, "weight": 1, "feed_cost": 12500_00},
-        {"feed_params": {"size": 1, "sinks": True}, "weight": 1, "feed_cost": 8000_00},
-        {"feed_params": {"size": 1, "rate": .8}, "weight": 1, "feed_cost": 8000_00}
+        {"feed_params": {"size": 1.0}, "weight": 1000, "feed_cost": 10000_00},
+        {"feed_params": {"size": 0.8}, "weight": 1000, "feed_cost": 12500_00},
+        {"feed_params": {"size": 1, "sinks": True}, "weight": 1000, "feed_cost": 8000_00},
+        {"feed_params": {"size": 1, "rate": .8}, "weight": 1000, "feed_cost": 8000_00}
     ])
     def test_feed_cost(self, params):
         feed_params = params['feed_params']

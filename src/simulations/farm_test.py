@@ -8,7 +8,6 @@ from simulations.farm import Farm
 from simulations.feed import Feed
 from simulations.pond import Pond
 
-
 class TestFarm():
     @pytest.mark.parametrize("params", [
         {"env": simpy.Environment(), "name": "Random", "money": 100_000},
@@ -27,6 +26,65 @@ class TestFarm():
     def test_fail_create_invalid_farm(self, params):
         with pytest.raises(TypeError):
             Farm(**params)
+
+    @pytest.mark.parametrize("params", [
+        {
+            "farming_model": FarmingModel(stocks=[Stock(1, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])]),
+            "money": 100_000_00,
+            "until": 31,
+            "n_cycles": 2,
+            "last_stock_id": 1,
+        },
+        {
+            "farming_model": FarmingModel(stocks=[Stock(1, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])]),
+            "money": 100_000_00,
+            "until": 70,
+            "n_cycles": 3,
+            "last_stock_id": 1,
+        },
+        {
+            "farming_model": FarmingModel(
+                stocks=[
+                    Stock(1, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")]),
+                    Stock(2, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
+                ]
+            ),
+            "money": 100_000_00,
+            "until": 60,
+            "n_cycles": 2,
+            "last_stock_id": 2,
+        },
+        {
+            "farming_model": FarmingModel(
+                stocks=[
+                    Stock(1, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")], gap=0),
+                    Stock(2, "Catfish", 20, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
+                ]
+            ),
+            "money": 1_000_000_00,
+            "until": 60,
+            "n_cycles": 4,
+            "last_stock_id": 2,
+        },
+    ])
+    def test_farm_existence(self, params):
+        farming_model = params['farming_model']
+        money = params['money']
+        until = params['until']
+        n_cycles = params['n_cycles']
+        last_stock_id = params['last_stock_id']
+
+        env = simpy.Environment()
+        farm = Farm(env, "Random", money=money, ponds=[], feeds=[], farming_model=farming_model)
+        env.run(until)
+
+        n_farm_cycles = len(farm.cycles)
+        assert n_cycles == n_farm_cycles
+
+        last_cycle = farm.cycles[-1]
+        assert last_cycle.stock.id == last_stock_id
+
+        assert farm.money.level >= money
 
     @pytest.mark.parametrize("params", [
         {
@@ -49,19 +107,20 @@ class TestFarm():
         balance = params['balance']
 
         farm = Farm(**farm_params)
-        transact_process = farm.transact(action, amount, "Random")
+        transact_process = farm.transact(action, amount, "Random", farm.tag)
+        next(transact_process)
         next(transact_process)
         assert farm.money.level == balance
 
     @pytest.mark.parametrize("params", [
         {
             "farm_params" : {"env": simpy.Environment(), "name": "Random", "money": 100_000_00, "feeds": []},
-            "weight": 1,
+            "weight": 1000,
             "balance": 90_000_00
         },
         {
             "farm_params" : {"env": simpy.Environment(), "name": "Random", "money": 100_000_00, "feeds": []},
-            "weight": 10,
+            "weight": 10000,
             "balance": 0
         },
     ])
@@ -71,7 +130,7 @@ class TestFarm():
         balance = params['balance']
         feed_size = 1
 
-        farm = Farm(**farm_params)
+        farm = Farm(**farm_params, active=False)
         check_feed = farm.feed_exists(feed_size)
         assert check_feed == False
 
@@ -87,22 +146,22 @@ class TestFarm():
         {
             "farm_params" : {"name": "Random", "money": 100_000_00, "feeds": [], "ponds": []},
             "pond_params": {"id": 1, "type": "Portable_Pond"},
-            "balance": 94_000_00,
+            "balance": 40_000_00,
             "until": 1,
             "num_ponds": 1
         },
         {
             "farm_params" : {"name": "Random", "money": 100_000_00, "feeds": [], "ponds": []},
-            "pond_params": {"id": 1, "type": "Concrete_Pond", "duration": 365},
-            "balance": 99_000_00,
-            "until": 300,
+            "pond_params": {"id": 1, "type": "Concrete_Pond", "duration": 10},
+            "balance": 98_767_13,
+            "until": 15,
             "num_ponds": 1
         },
         {
             "farm_params" : {"name": "Random", "money": 100_000_00, "feeds": [], "ponds": []},
-            "pond_params": {"id": 1, "type": "Concrete_Pond", "duration": 365},
-            "balance": 99_000_00,
-            "until": 369,
+            "pond_params": {"id": 1, "type": "Concrete_Pond", "duration": 30},
+            "balance": 98_767_13,
+            "until": 33,
             "num_ponds": 0
         },
     ])
@@ -114,7 +173,7 @@ class TestFarm():
         num_ponds = params["num_ponds"]
 
         env = simpy.Environment()
-        farm = Farm(**{**farm_params, "env": env})
+        farm = Farm(**{**farm_params, "env": env}, active=False)
         pond = Pond(**{**pond_params, "env": env})
 
         env.process(farm.acquire_pond(pond))
@@ -159,68 +218,48 @@ class TestFarm():
 
     @pytest.mark.parametrize("params", [
         {
-            "farming_model": FarmingModel(
-                stocks=[
-                    Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
-                ]
-            ),
+            "farming_model": FarmingModel(stocks=[Stock(1, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])]),
             "money": 100_000_00,
-            "until": 30,
+            "until": 31,
             "n_cycles": 1,
-            "last_stock_id": "Catfish_0",
-            "balance": 90_000_00
+            "last_stock_id": 1,
         },
         {
             "farming_model": FarmingModel(
                 stocks=[
-                    Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
+                    Stock(2, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")]),
+                    Stock(1, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")]),
                 ]
             ),
             "money": 100_000_00,
             "until": 60,
-            "n_cycles": 2,
-            "last_stock_id": "Catfish_1",
-            "balance": 90_000_00
+            "n_cycles": 1,
+            "last_stock_id": 2,
         },
         {
             "farming_model": FarmingModel(
                 stocks=[
-                    Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")]),
-                    Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
+                    Stock(1, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")], gap=0),
+                    Stock(2, "Catfish", 20, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
                 ]
             ),
             "money": 100_000_00,
             "until": 60,
-            "n_cycles": 2,
-            "last_stock_id": "Catfish_1",
-            "balance": 90_000_00
-        },
-        {
-            "farming_model": FarmingModel(
-                stocks=[
-                    Stock("Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")], gap=0),
-                    Stock("Catfish", 20, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])
-                ]
-            ),
-            "money": 100_000_00,
-            "until": 60,
-            "n_cycles": 4,
-            "last_stock_id": "Catfish_3",
-            "balance": 90_000_00
+            "n_cycles": 1,
+            "last_stock_id": 1,
         },
     ])
-    def test_run_cycles(self, params):
+    def test_run_next_cycle(self, params):
         farming_model = params['farming_model']
         money = params['money']
         until = params['until']
         n_cycles = params['n_cycles']
         last_stock_id = params['last_stock_id']
-        balance = params['balance']
 
         env = simpy.Environment()
-        farm = Farm(env, "Random", money, ponds=[], feeds=[], farming_model=farming_model)
+        farm = Farm(env, "Random", money=money, ponds=[], feeds=[], farming_model=farming_model, active=False)
 
-        env.process(farm.exist())
+        env.process(farm.run_next_cycle())
         env.run(until)
 
         n_farm_cycles = len(farm.cycles)
@@ -229,6 +268,6 @@ class TestFarm():
         last_cycle = farm.cycles[-1]
         assert last_cycle.stock.id == last_stock_id
 
-        # assert farm.money.level == balance
+        assert farm.money.level >= money
 
     

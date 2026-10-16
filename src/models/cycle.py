@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from uuid import uuid4
 
@@ -25,12 +25,12 @@ class Phase():
 
 @dataclass
 class Stock():
+    id: int
     type: FISH_TYPES
     count: int
     size: FISH_SIZES
     phases: list[Phase]
     gap: Optional[int] = None
-    id: str = ""
 
     @property
     def duration(self) -> int:
@@ -40,6 +40,9 @@ class Stock():
 class CycleModel(Entity):    
     stock = Stock
     batches: list[BatchModel] = []
+
+    def split_phase(self, phase: Phase):
+        ...
     
     def run_phases(self) -> Generator:
         ...
@@ -48,5 +51,8 @@ class CycleModel(Entity):
         ...
 
     def harvest_fishes(self) -> Generator:
+        ...
+
+    def exist(self) -> Generator:
         ...
         

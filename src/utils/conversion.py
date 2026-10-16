@@ -1,14 +1,20 @@
+KILO = 1000
+NAIRA = 100
+DAY_IN_HOURS = 24
+HOUR_IN_MINUTES = 60
+MINUTE_IN_SECONDS = 60
+
 def to_kobo(naira):
-    return round(naira * 100)
+    return round(naira * NAIRA)
 
 def to_naira(kobo):
-    return round(kobo/100, 2)
+    return round(kobo/NAIRA, 2)
 
 def to_money(kobo):
-    return f"₦{ kobo / 100:,.2f}"
+    return f"₦{ kobo / NAIRA:,.2f}"
 
 def to_grams(kg):
-    return round(kg * 1000)
+    return round(kg * KILO)
 
 def to_kilo(gram):
-    return gram / 1000
+    return gram / KILO
