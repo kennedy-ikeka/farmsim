@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from pydantic import Field
 from typing_extensions import Generator
 
@@ -5,6 +7,11 @@ import simpy
 import numpy as np
 
 from src.models.entity import Entity
+
+@dataclass
+class FeedBatch:
+    time: float
+    stock: simpy.Container
 
 class FeedModel(Entity): 
     size: float = Field(description="The size of the feed")

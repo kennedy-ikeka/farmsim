@@ -1,12 +1,15 @@
+from datetime import datetime
+
 import simpy
 import numpy as np
 
+from models.simulation import SimulationModel
 from src.models.pond import POND_RENTAL_INTERVAL, POND_TYPE_DETAILS, POND_TYPES, PondModel
 from utils.conversion import DAY_IN_HOURS, HOUR_IN_MINUTES
 
 class Pond(PondModel):
-    def __init__(self, env, id: int, type: POND_TYPES, length=1.0, width=1.0, depth=1.0, density = 1.0, health=100, duration: int=0, aerated=False, verbose=0, seed=0):
-        super().__init__(env, type=type, id=id, verbose=verbose, seed=seed)
+    def __init__(self, sim: SimulationModel, id: int, type: POND_TYPES, length=1.0, width=1.0, depth=1.0, density = 1.0, health=100, duration: int=0, aerated=False, verbose=0, active=True):
+        super().__init__(sim, type=type, id=id, verbose=verbose, active=active)
         self.id = id
         self.length = length
         self.width = width
@@ -18,9 +21,9 @@ class Pond(PondModel):
         self.aerated = aerated
         self.since = self.env.now
         
-        self.health = simpy.Container(env=env, capacity=100, init=health)
-        self.water = simpy.Container(env=env, capacity=self.volume, init=self.volume)
-        self.feed = simpy.Container(env=env, init=0)
+        self.health = simpy.Container(env=self.env, capacity=100, init=health)
+        self.water = simpy.Container(env=self.env, capacity=self.volume, init=self.volume)
+        self.feed = simpy.Container(env=self.env, init=0)
         self.fishes = []
 
         # ponds are rented in POND_RENTAL_INTERVALs
@@ -53,6 +56,8 @@ class Pond(PondModel):
 
         yield self.water.get(self.water.level)
         self.info("Drained pond water")
+
+        yield self.feed.get(self.feed.level)
 
         # Fill the pond with clean water
         t_fill = self.drain_speed * self.volume
@@ -95,7 +100,6 @@ class Pond(PondModel):
 
             yield self.feed.put(feed_weight)
             self.info(f"Spawned feed weighing {feed_weight:.2f} units")
-
 
     def seepage(self):
         ...

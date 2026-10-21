@@ -1,29 +1,30 @@
 import simpy
 from typing_extensions import Literal
-import numpy as np
+from datetime import datetime
 
 from models.animal import FISH_SIZE_DETAILS, FISH_SIZES
 from models.cycle import CycleModel
 from models.feed import FeedModel
+from models.simulation import SimulationModel
 from simulations.pond import Pond
 from src.models.pond import PondModel
 from src.models.farm import FarmingModel, FarmModel
 from simulations.cycle import Cycle
-from utils.conversion import to_grams, to_kilo
+from utils.conversion import to_kilo
 from utils.helper import get_param
 
 class Farm(FarmModel):
-    def __init__(self, env, name, id=0, money=0, farming_model = FarmingModel(), ponds: list[PondModel]=[], feeds: list[FeedModel]=[], verbose=0, active=True, seed=0):
-        super().__init__(env, type="Farm", id=id, verbose=verbose, active=active, seed=seed)
+    def __init__(self, sim: SimulationModel, name, id=0, farming_model = FarmingModel(), ponds: list[PondModel]=[], feeds: list[FeedModel]=[], verbose=0, active=True):
+        super().__init__(sim, type="Farm", id=id, verbose=verbose, active=active)
         self.name = name
         self.ponds = ponds
         self.feeds = feeds
-        self.money = simpy.Container(env, init=money) # in kobo
+        self.money = simpy.Container(self.env, init=farming_model.capital) # in kobo
         self.cycles: list[CycleModel] = []
         self.farming_model = farming_model
 
         self.t_next_cycle = 0
-        self.stocking_pond = Pond(self.env, 1, 'Portable_Pond', seed=seed)
+        self.stocking_pond = Pond(sim, 1, 'Portable_Pond')
 
         self.existence = self.env.process(self.exist())
 
@@ -91,7 +92,7 @@ class Farm(FarmModel):
         max_biomass_per_m3: int = get_param(self.farming_model.max_biomass_per_m3, target_weight) 
         required_volume = reqiured_biomass / max_biomass_per_m3
         dimension = required_volume ** (1/3)
-        return Pond(env=self.env, id=len(self.ponds), type="Earthen_Pond", length=dimension, width=dimension, depth=dimension, duration=duration, seed=self.seed)
+        return Pond(sim=self.sim, id=len(self.ponds), type="Earthen_Pond", length=dimension, width=dimension, depth=dimension, duration=duration)
 
     def acquire_pond(self, pond: PondModel, renew=False):
         cost = pond.get_cost()
@@ -135,7 +136,7 @@ class Farm(FarmModel):
         stock = self.farming_model.stocks[0]
 
         # initiate the cycle
-        cycle = Cycle(self.env, self, stock, id=len(self.cycles), seed=self.seed)
+        cycle = Cycle(self.sim, self, stock, id=len(self.cycles))
         self.cycles.append(cycle)
 
         # move the stock to the buttom of the stock queue
@@ -152,4 +153,6 @@ class Farm(FarmModel):
             yield self.env.process(self.run_next_cycle())
 
     def terminate(self):
+        yield self.env.timeout(0)
         self.active = False
+        

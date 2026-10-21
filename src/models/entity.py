@@ -1,40 +1,32 @@
 import simpy
 import numpy as np
 import pandas as pd
+from datetime import datetime
+from os import makedirs
 
-class Entity:
-    def __init__(self, env: simpy.Environment, type: str, id: int, verbose: int = 0, seed=0, active=True):
-        self.env = env
+from models.simulation import SimulationModel
+from utils.logger import Logger
+
+class Entity(Logger):
+    def __init__(self, sim: SimulationModel, type: str, id: int, verbose: int = 0, active=True):
+        super().__init__(sim.env, f"{type}_{id}", verbose=verbose)
+        self.sim = sim
         self.type = type
         self.id = id
-        self.tag = f"{self.type}_{self.id}"
-        self.verbose = verbose
-        self.seed = seed
         
-        np.random.seed(seed)
+        np.random.seed(self.sim.seed)
         self.rng = np.random
 
         self.tables = {}
         self.active = active
         self.start_time = self.env.now
 
-    def error(self, message):
-        if self.verbose >= 1:
-            print(f"[Error] [{self.env.now}] {self.tag}: {message}")  
+        self.plug_in()
 
-    def info(self, message: str):
-        if self.verbose >= 2:
-            print(f"[Info] [{self.env.now}] {self.tag}: {message}")    
-
-    def metric(self, domain: str, data: dict):
-        table = self.tables.get(domain, None)
-        if not table:
-            self.tables[domain] = []
-            table = self.tables[domain]
-
-        table.append({"time": self.env.now, "tag": self.tag, **data})
-        if self.verbose >= 3:
-            print(f"[Metric] [{self.env.now}] {self.tag}: {domain}: {data}")  
+    def plug_in(self):
+        type_entities: list = self.sim.entitles.get(self.type, [])
+        type_entities.append(self)
+        self.sim.entitles[self.type] = type_entities
 
     def run(self, until):
         """Run the entity"""
@@ -52,4 +44,14 @@ class Entity:
 
     def get_age(self):
         return int(self.env.now - self.start_time)
-    
+
+    def save(self):        
+        now = self.sim.timestamp.strftime("%d_%m_%Y_%H_%M_%S")
+        path = f'../data/simulations_{now}'
+        makedirs(path, exist_ok=True)
+
+        for table in self.tables.keys():
+            frame = self.get_frame(table)
+            if frame is None:
+                continue
+            frame.to_csv(f"{path}/{self.tag}_{table}.csv")

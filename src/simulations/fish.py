@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from typing_extensions import Optional
 
 import simpy
@@ -13,14 +15,14 @@ feeding_logs = []
 class Fish(FishModel):
     """A fish entity in the the simulation"""
 
-    def __init__(self, pond: PondModel, id: int, type: FISH_TYPES, weight: float, stock_id: Optional[int] = None, batch_id: Optional[int] = None, stomach=100, health=100, verbose=0, seed=0):
-        super().__init__(pond.env, type=type, id=id, verbose=verbose, seed=seed)
+    def __init__(self, pond: PondModel, id: int, type: FISH_TYPES, weight: float, stock_id: Optional[int] = None, batch_id: Optional[int] = None, stomach=100, health=100, verbose=0, active=True):
+        super().__init__(pond.sim, type=type, id=id, verbose=verbose, active=active)
         self.pond = pond
         self.type = type
         self.id = id
-        self.weight = simpy.Container(pond.env, init=weight)
-        self.stomach = simpy.Container(pond.env, capacity=100, init=stomach)
-        self.health = simpy.Container(pond.env, capacity=100, init=health)
+        self.weight = simpy.Container(self.env, init=weight)
+        self.stomach = simpy.Container(self.env, capacity=100, init=stomach)
+        self.health = simpy.Container(self.env, capacity=100, init=health)
         self.stock_id = stock_id
         self.batch_id = batch_id
         self.active = True

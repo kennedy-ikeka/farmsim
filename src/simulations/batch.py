@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from datetime import datetime
 
 import numpy as np
 from faker import Faker
@@ -14,9 +14,8 @@ from utils.helper import get_param
 faker = Faker()
 
 class Batch(BatchModel):
-    feeding = 0
-    def __init__(self, id: int, farm: FarmModel, pond: PondModel, fishes: list[FishModel], cycle_id: int, duration: int, verbose=0, active=True, seed=0) -> None:
-        super().__init__(pond.env, type="Batch", id=id, verbose=verbose, active=active, seed=seed)
+    def __init__(self, id: int, farm: FarmModel, pond: PondModel, fishes: list[FishModel], cycle_id: int, duration: int, verbose=0, active=True) -> None:
+        super().__init__(farm.sim, type="Batch", id=id, verbose=verbose, active=active)
         self.farm = farm
 
         if len(fishes) == 0:
@@ -31,7 +30,6 @@ class Batch(BatchModel):
         self.t_next_feeding = 1
 
         self.existence = self.env.process(self.exist())
-
 
     def get_next_feeding_time(self):
         """Get the next time to feed the fishes based on feeding hours"""
@@ -89,8 +87,9 @@ class Batch(BatchModel):
                 feed_size = self.get_feed_size()
 
                 weight = np.median([f.weight.level for f in self.fishes])
-                rate: float = get_param(self.farm.farming_model.feed_conversion_rate, weight)  
-                feed = Feed(env=self.env, name=faker.name(), size=feed_size, seed=self.seed, rate=rate)            
+                rate: float = get_param(self.farm.farming_model.feed_conversion_rate, weight)
+                floats: bool = get_param(self.farm.farming_model.feed_floating, weight)  
+                feed = Feed(sim=self.sim, name=faker.name(), size=feed_size, rate=rate, floats=floats)            
 
             # Should refill feed?
             remaining_feed = feed.get_quantity()
@@ -142,6 +141,7 @@ class Batch(BatchModel):
                 yield self.env.process(self.terminate())
 
     def exist(self):
+        print(f"Batch - {self.id} started at {self.env.now:2f}")
         yield self.env.timeout(0)
 
         self.pond.fishes = self.fishes
@@ -158,3 +158,5 @@ class Batch(BatchModel):
         self.active = False
         self.pond.fishes = []
         yield self.env.timeout(0)
+
+        print(f"Batch - {self.id} completed at {self.env.now:2f}")

@@ -6,8 +6,8 @@ from src.simulations.feed import Feed
 class TestFeed:
     @pytest.mark.parametrize("params", [
         {"env": simpy.Environment(), "name": "Random", "size": 1.0},
-        {"env": simpy.Environment(), "name": "Random", "size": 1.0, "sinks": False},
-        {"env": simpy.Environment(), "name": "Random", "size": 1.0, "sinks": True, "rate": .9}
+        {"env": simpy.Environment(), "name": "Random", "size": 1.0, "floats": True},
+        {"env": simpy.Environment(), "name": "Random", "size": 1.0, "floats": False, "rate": .9}
     ])
     def test_create_feed(self, params):
         feed = Feed(**params)
@@ -94,7 +94,7 @@ class TestFeed:
     @pytest.mark.parametrize("params", [
         {"feed_params": {"size": 1.0}, "weight": 1000, "feed_cost": 10000_00},
         {"feed_params": {"size": 0.8}, "weight": 1000, "feed_cost": 12500_00},
-        {"feed_params": {"size": 1, "sinks": True}, "weight": 1000, "feed_cost": 8000_00},
+        {"feed_params": {"size": 1, "floats": False}, "weight": 1000, "feed_cost": 8000_00},
         {"feed_params": {"size": 1, "rate": .8}, "weight": 1000, "feed_cost": 8000_00}
     ])
     def test_feed_cost(self, params):

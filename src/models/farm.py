@@ -14,9 +14,11 @@ TRANSACTION_TYPES = Literal["credit", "debit"]
 
 
 class FarmingModel(BaseModel):
+    capital: int = Field(default=0, description="The farming capital", ge=0)
     stocks: list[Stock] = Field(default_factory=list, min_length=1)
-    feeding_hours: dict[int, list[int]] = Field(default={0: [7, 19]}, description="The interval for medicating fishes based on size") # at 7am and 7pm
-    feed_conversion_rate: dict[int, float] = Field(default={0: 1.2}, description="The interval for medicating fishes based on size")
+    feeding_hours: dict[int, list[int]] = Field(default={0: [7, 19]}, description="The hours for feeding fishes based on size") # at 7am and 7pm
+    feed_conversion_rate: dict[int, float] = Field(default={0: 1.2}, description="The conversion of rate of the feed based on size")
+    feed_floating: dict[int, bool] = Field(default={0: False}, description="The interval for medicating fishes based on size")
     max_biomass_per_m3: dict[int, int] = Field(default={0: 30}, description="Max biomax for pond based on size")
     pond_contamination_limit: dict[int, float] = Field(default={0: .5}, description="Contamination limits based on size")
     medication_interval: dict[int, int] = Field(default={0: 14}, description="The interval for medicating fishes based on size") # every 2weeks

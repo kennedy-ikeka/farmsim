@@ -1,6 +1,7 @@
-import numpy as np
+from datetime import datetime
 
 from models.batch import BatchModel
+from models.simulation import SimulationModel
 from simulations.batch import Batch
 from simulations.fish import Fish
 from src.models.farm import FarmModel
@@ -10,8 +11,8 @@ from utils.conversion import to_kilo, to_kobo, to_naira
 
 class Cycle(CycleModel):
     """A full farming circle, from stocking to harvest"""
-    def __init__(self, env, farm: FarmModel, stock: Stock, id: int, verbose=0, active=True, seed=0) -> None:
-        super().__init__(env, type="Cycle", id=id, verbose=verbose, active=active, seed=seed)
+    def __init__(self, sim: SimulationModel, farm: FarmModel, stock: Stock, id: int, verbose=0, active=True) -> None:
+        super().__init__(sim, type="Cycle", id=id, verbose=verbose, active=active)
         self.id = id
         self.farm = farm
         self.stock = stock
@@ -58,7 +59,7 @@ class Cycle(CycleModel):
 
             all_batches = [b for c in self.farm.cycles for b in c.batches]
             batch_id = len(all_batches) + len(phase_batches)
-            batch = Batch(batch_id, self.farm, pond, fishes=b, duration=phase.duration, cycle_id=self.id, seed=self.seed)
+            batch = Batch(batch_id, self.farm, pond, fishes=b, duration=phase.duration, cycle_id=self.id)
             phase_batches.append(batch)
 
         self.batches.append(phase_batches)
@@ -81,7 +82,7 @@ class Cycle(CycleModel):
 
         # Create the fishes and stock them in the pond
         self.fishes = [
-            Fish(pond=self.farm.stocking_pond, id=id, type='Catfish', weight=self.rng.exponential(fish_size), stock_id=self.stock.id, seed=self.seed)
+            Fish(pond=self.farm.stocking_pond, id=id, type='Catfish', weight=self.rng.exponential(fish_size), stock_id=self.stock.id)
             for id in range(num_fishes)
         ]
         self.start_time = self.env.now
