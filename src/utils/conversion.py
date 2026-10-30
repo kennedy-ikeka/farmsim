@@ -13,7 +13,7 @@ def to_naira(kobo):
 def to_money(kobo):
     return f"₦{ kobo / NAIRA:,.2f}"
 
-def to_grams(kg):
+def to_gram(kg):
     return round(kg * KILO)
 
 def to_kilo(gram):

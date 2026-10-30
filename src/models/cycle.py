@@ -1,21 +1,18 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
-from uuid import uuid4
 
 from typing_extensions import Generator
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
-from models.animal import FISH_SIZES, FISH_TYPES
-from models.batch import BatchModel
-from models.pond import PondModel
-from src.models.entity import Entity
-from utils.conversion import to_kilo
+from src.models.asset import Asset
+from src.models.fish import FISH_SIZES, FISH_TYPES
+from src.models.batch import BatchModel
 
 @dataclass
 class Phase():
     duration: int
     fractions: list[float]
-    harvest: float = Field(description="The fraction to harvest after phase", le=1, gt=0)
+    harvest: float = Field(description="The fraction to harvest after phase", le=1, ge=0)
     target_size: FISH_SIZES = Field(description="The target size for this phase")
 
     @field_validator("fractions", check_fields=False)
@@ -37,9 +34,11 @@ class Stock():
         return sum([p.duration for p in self.phases])
 
 
-class CycleModel(Entity):    
-    stock = Stock
-    batches: list[BatchModel] = []
+class CycleModel(Asset):   
+    farm_id: str = Field(..., description="The farm id for the cycle")
+    stock: Stock = Field(..., description="The cycles stocking")
+    batches: list[list[BatchModel]] = Field(default_factory=list, description="The cycle batches")
+    kind: str = Field(default="Cycle")
 
     def split_phase(self, phase: Phase):
         ...

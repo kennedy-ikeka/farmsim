@@ -1,26 +1,28 @@
+from pydantic import ValidationError
 import pytest
 import simpy
 
+from src.simulations.simulation import Simulation
 from src.simulations.pond import Pond
 
 class TestPond():
     @pytest.mark.parametrize("params", [
-        {"env": simpy.Environment(), "id": 1, "type": "Earthen_Pond"},
-        {"env": simpy.Environment(), "id": 1, "type": "Earthen_Pond", "length": 2, "width": 2, "depth": 1},
-        {"env": simpy.Environment(), "id": 1, "type": "Earthen_Pond", "density": 1.5}
+        {"id": "1", "type": "Earthen_Pond"},
+        {"id": "1", "type": "Earthen_Pond", "length": 2, "width": 2, "depth": 1},
+        {"id": "1", "type": "Earthen_Pond", "density": 1.5}
     ])
     def test_create_pond(self, params):
         pond = Pond(**params)
-        assert pond.id == 1
-        assert pond.tag == f'Earthen_Pond_1'
+        assert pond.id == "1"
+        assert pond.tag == f'Pond_1'
 
     @pytest.mark.parametrize("params", [
         {},
-        {"env": simpy.Environment(), "length": 2, "width": 2, "depth": 1},
-        {"env": simpy.Environment(), "id": 1}
+        {"length": 2, "width": 2, "depth": 1},
+        {"id": "1"}
     ])
     def test_fail_create_invalid_pond(self, params):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValidationError):
             Pond(**params)
 
     @pytest.mark.parametrize("params", [
@@ -49,12 +51,11 @@ class TestPond():
         health_level = params['health_level']
         until = params['until']
 
-        env = simpy.Environment()
-        pond = Pond(env, id=1, **pond_params)
+        pond = Pond(**pond_params)
         pond.run(until)
 
-        assert round(pond.health.level, 2) == health_level
-        assert round(pond.feed.level, 2) == feed_level
+        assert round(pond.containers['health'].level, 2) == health_level
+        assert round(pond.containers['feed'].level, 2) == feed_level
 
     @pytest.mark.parametrize("params", [
         {
@@ -74,7 +75,7 @@ class TestPond():
         pond_params = params['pond_params']
         pond_cost = params['pond_cost']
 
-        pond = Pond(env=simpy.Environment(), id=1, **pond_params)
+        pond = Pond(**pond_params)
         cost = pond.get_cost()
         assert cost == pond_cost
 
@@ -100,10 +101,9 @@ class TestPond():
         feed_level = params['feed_level']
         until = params['until']
 
-        env = simpy.Environment()
-        pond = Pond(env, id=1, **pond_params)
+        pond = Pond(**pond_params)
         pond.run(until)
-        assert round(pond.feed.level, 5) == feed_level
+        assert round(pond.containers['feed'].level, 5) == feed_level
 
     @pytest.mark.parametrize("params", [
         {
@@ -132,11 +132,10 @@ class TestPond():
         health_level = params['health_level']
         until = params['until']
 
-        env = simpy.Environment()
-        pond = Pond(env, id=1, **pond_params)
+        pond = Pond(**pond_params)
         pond.run(until)
 
-        assert round(pond.health.level, 2) == health_level
+        assert round(pond.containers['health'].level, 2) == health_level
 
     @pytest.mark.parametrize("params", [
         {
@@ -156,14 +155,13 @@ class TestPond():
         pond_params = params['pond_params']
         until = params['until']
 
-        env=simpy.Environment()
-        pond = Pond(env=env, id=1, **pond_params)
+        pond = Pond(**pond_params)
         pond.run(until=until)
 
-        health = pond.health.level
-        assert pond.health.level < 100
+        health = pond.containers['health'].level
+        assert pond.containers['health'].level < 100
 
-        env.process(pond.decontaminate())
-        extended_time = (until/2) + env.now
-        env.run(extended_time)
-        assert pond.health.level >= health
+        pond.env.process(pond.decontaminate())
+        extended_time = (until/2) + pond.env.now
+        pond.env.run(extended_time)
+        assert pond.containers['health'].level >= health

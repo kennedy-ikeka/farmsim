@@ -1,37 +1,14 @@
-from datetime import datetime
+from simpy import Container
 
-import simpy
-
-from models.simulation import SimulationModel
 from src.models.feed import FeedBatch, FeedModel
-from utils.conversion import to_kobo
+from src.utils.conversion import to_kobo
 
 class Feed(FeedModel):
-    def __init__(self, sim: SimulationModel, name: str, size: float, floats=True, rate=1.0, verbose=0, active=True):
-        super().__init__(sim, type="Feed", id=0, verbose=verbose, active=active)
-        self.name = name
-        self.size = size
-        self.floats = floats
-        self.rate = rate
-
-        # The tag is a unique identifier for the feed stock, based on its name and size
-        self.tag = f"{self.name}_{self.size}"
-
-        # The different batches of the feed
-        self.batches: list[FeedBatch] = []
-
+    def model_post_init(self, __context):
+        super().model_post_init(__context)
+        
         # Start the expiry process
-        self.existence = self.env.process(self.exist())
-
-    def __str__(self):
-        return f"""
-            size: {self.size}
-            floats: {self.floats}
-            rate: {self.rate}
-            tag: {self.tag}
-            batches: {len(self.batches)}
-            quantity: {self.get_quantity()}
-        """       
+        self.processes['existence'] = self.env.process(self.exist())    
 
     def get_cost(self, weight: int):
         """Get the cost of weight of feed"""
@@ -54,7 +31,7 @@ class Feed(FeedModel):
 
         counter = 0 # Initialize counter
         for b in self.batches: # Take starting from the earliest batch
-            stock: simpy.Container = b.stock
+            stock: Container = b.stock
             take = weight if stock.level >= weight else stock.level
             if take > 0:
                 yield stock.get(take) # Update batch
@@ -71,7 +48,7 @@ class Feed(FeedModel):
     def refill(self, weight: float):
         """Add a new batch to the feed"""
         # Initialize batch
-        batch = FeedBatch(self.env.now, simpy.Container(self.env, init=weight))
+        batch = FeedBatch(self.env.now, Container(self.env, init=weight))
 
         # Add batch to feed
         self.batches.append(batch)
@@ -99,4 +76,4 @@ class Feed(FeedModel):
 
         if self.active:
             # Start the expiry process
-            self.expire_process = self.env.process(self.expire())
+            self.processes['expire'] = self.env.process(self.expire())

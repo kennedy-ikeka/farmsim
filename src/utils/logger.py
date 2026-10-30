@@ -1,12 +1,21 @@
-import simpy
+from uuid import uuid4
 
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+from simpy.core import Environment
 
-class Logger:
-    def __init__(self, env: simpy.Environment, tag: str, verbose=0) -> None:
-        self.env = env
-        self.verbose = verbose
-        self.tag = tag
-        self.tables = {}
+class Logger(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    env: Environment = Field(default_factory=Environment, description="The simulation environment")
+    kind: str = Field(..., description="The kind of entity")
+    id: str = Field(default_factory=lambda: uuid4().hex, description="The id of the entity")
+    verbose: int = Field(default=0, description="The log level", ge=0, le=3)
+    tables: dict[str, list[dict]] = Field(default_factory=dict, description="The tables for the entity")
+
+    @computed_field
+    @property
+    def tag(self) -> str:
+        return f"{self.kind}_{self.id}"
 
     def error(self, message):
         if self.verbose >= 1:

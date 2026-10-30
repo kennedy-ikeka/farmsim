@@ -1,20 +1,17 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field, field_validator
-import simpy
 from typing_extensions import Generator, Literal
 
-from models.animal import FISH_SIZES
-from models.cycle import CycleModel, Stock
-from models.pond import PondModel
+from src.models.asset import Asset
+from src.models.fish import FISH_SIZES
+from src.models.cycle import CycleModel, Stock
+from src.models.pond import PondModel
 from src.models.feed import FeedModel
-from src.models.entity import Entity
 
 TRANSACTION_TYPES = Literal["credit", "debit"]
 
 
-class FarmingModel(BaseModel):
-    capital: int = Field(default=0, description="The farming capital", ge=0)
+class FarmBusinessModel(BaseModel):
+    capital: int = Field(default=100_000_00, description="The farming capital", ge=0)
     stocks: list[Stock] = Field(default_factory=list, min_length=1)
     feeding_hours: dict[int, list[int]] = Field(default={0: [7, 19]}, description="The hours for feeding fishes based on size") # at 7am and 7pm
     feed_conversion_rate: dict[int, float] = Field(default={0: 1.2}, description="The conversion of rate of the feed based on size")
@@ -22,16 +19,7 @@ class FarmingModel(BaseModel):
     max_biomass_per_m3: dict[int, int] = Field(default={0: 30}, description="Max biomax for pond based on size")
     pond_contamination_limit: dict[int, float] = Field(default={0: .5}, description="Contamination limits based on size")
     medication_interval: dict[int, int] = Field(default={0: 14}, description="The interval for medicating fishes based on size") # every 2weeks
-    stock_increase_rate: float = Field(default=0, description="The rate at which the stocking quantity increases")
-
-    @field_validator('stock_increase_rate')
-    def vaidate_stock_increase_rate(cls, v: dict[int, float]):
-        for k, val in v.items():
-            if k < 0:
-                raise ValueError(f"Not a valid weight for stock_increase_rate: {k}")
-            if 0 > val > 1:
-                raise ValueError(f"Not a valid stock_increase_rate: {val}, for weight: {k}")
-        return v
+    stock_increase_rate: float = Field(default=0, description="The rate at which the stocking quantity increases", ge=0, le=1)
 
     @field_validator('pond_contamination_limit')
     def vaidate_pond_contamination_limit(cls, v: dict[int, float]):
@@ -62,13 +50,14 @@ class FarmingModel(BaseModel):
         return v
 
 
-class FarmModel(Entity):
-    money: simpy.Container
-    feeds: list[FeedModel]
-    ponds: list[PondModel]
-    cycles: list[CycleModel]
-    stocking_pond: PondModel
-    farming_model: FarmingModel
+class FarmModel(Asset):
+    name: str = Field(..., description="The name of the farm")
+    business_model: FarmBusinessModel = Field(default_factory=FarmBusinessModel, description="The business model of the farm")
+    ponds: list[PondModel] = Field(default_factory=list, description="The ponds for the farm")
+    feeds: list[FeedModel] = Field(default_factory=list, description="The feeds for the farm")
+    cycles: list[CycleModel] = Field(default_factory=list, description="The cycles implemented by the farm")
+    stocking_pond: PondModel = Field(default_factory=lambda data: PondModel(sim=data["sim"], type="Portable_Pond"), description="The ponds stocking portable pond")
+    kind: str = Field(default="Farm")
     
     def transact(self, type: TRANSACTION_TYPES, amount: int, item: str, entity_tag: str, quantity=1) -> Generator:
         ...

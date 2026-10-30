@@ -1,56 +1,19 @@
-from dataclasses import dataclass
+
 from typing import Optional
 
-from typing_extensions import Generator, Literal
-from simpy.resources.container import Container
+from faker import Generator
+from pydantic import Field
+from simpy.events import ProcessGenerator
 
-from src.models.entity import Entity
+from src.models.asset import Asset
 
-COST_PER_KILO = 2_500_00 # In kobo
+class AnimalModel(Asset):
+    type: str = Field(..., description="The type of animal")
+    cycle_id: Optional[str] = Field(default=None, description="The cycle id of the animal")
+    batch_id: Optional[str] = Field(default=None, description="The batch id of the animal")
+    farm_id: Optional[str] = Field(default=None, description="The farm id of the animal")
+    kind: str = Field(default="Animal")
 
-FISH_TYPES = Literal[
-    "Catfish",
-    "Tilapia"
-]
-
-FISH_SIZES = Literal[
-    "Hatched",
-    "Fry",
-    "Small_Fingerlin",
-    "Medium_Fingerlin",
-    "Large_Fingerlin",
-    "Juveniles",
-    "Small_Table",
-    "Medium_Table",
-    "Large_Table",
-    "Jumbo"
-]
-
-@dataclass
-class FishSize:
-    min_size: int
-    max_size: int
-    feed_size: float
-    daily_feeding_ratio: float
-
-
-FISH_SIZE_DETAILS = {
-    "Hatched": FishSize(0, 1, .5, 0.05),
-    "Fry": FishSize(1, 5, .6, 0.05),
-    "Small_Fingerlin": FishSize(5, 10, .8, 0.04),
-    "Medium_Fingerlin": FishSize(10, 20, 1.2, 0.04),
-    "Large_Fingerlin": FishSize(20, 50, 1.5, 0.04),
-    "Juveniles": FishSize(50, 100, 2, 0.03),
-    "Small_Table": FishSize(100, 250, 3, 0.02),
-    "Medium_Table": FishSize(250, 500, 4, 0.02),
-    "Large_Table": FishSize(500, 1000, 5, 0.02),
-    "Jumbo": FishSize(1000, 2000, 6, 0.01),
-}
-
-class AnimalModel(Entity):
-    weight: Container
-    id: int
-    
     def get_hunger_rate(self) -> float:
         ...
 
@@ -84,13 +47,5 @@ class AnimalModel(Entity):
     def die(self) -> Generator:
         ...
 
-    def terminate(self) -> Generator:
+    def terminate(self) -> ProcessGenerator:
         ...
-
-class FishModel(AnimalModel):
-    stock_id: Optional[int]
-    batch_id: Optional[int]
-    def set_pond(self, pond):
-        ...
-
-

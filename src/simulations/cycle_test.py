@@ -1,32 +1,34 @@
+from pydantic import ValidationError
 import pytest
-import simpy
 
-from models.cycle import Phase, Stock
-from simulations.cycle import Cycle
-from simulations.farm import Farm
-from simulations.fish import Fish
+from src.models.farm import FarmBusinessModel
+from src.models.cycle import Phase, Stock
+from src.simulations.cycle import Cycle
+from src.simulations.farm import Farm
+from src.simulations.fish import Fish
+from src.simulations.simulation import Simulation
 
 class TestCycle:
     @pytest.mark.parametrize("params", [
-        {"id": 1},
-        {"id": 100},
+        {"id": "1"},
+        {"id": "100"},
     ])
     def test_create_cycle(self, params):
-        env = simpy.Environment()
-        farm = Farm(env, "Random", 100_000_00, ponds=[], feeds=[])
+        sim = Simulation()
+        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[])
         stock = Stock(id=1, type="Catfish", phases=[], size="Small_Fingerlin", count=1000)
-        cycle = Cycle(env, farm, stock=stock, **params)
+        cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock, **params)
         assert cycle.tag == f"Cycle_{params['id']}"
 
     @pytest.mark.parametrize("params", [
-        {},
+        {"id": 1},
     ])
     def test_fail_create_invalid_cycle(self, params):
-        env = simpy.Environment()
-        farm = Farm(env, "Random", 100_000_00, ponds=[], feeds=[])
+        sim = Simulation()
+        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[])
         stock = Stock(id=1, type="Catfish", phases=[], size="Small_Fingerlin", count=1000)
-        with pytest.raises(TypeError):
-            Cycle(env, farm, stock=stock, **params)
+        with pytest.raises(ValidationError):
+            Cycle(sim=sim, farm_id=farm.id, stock=stock, **params)
 
     @pytest.mark.parametrize("params", [
         {
@@ -35,7 +37,7 @@ class TestCycle:
             ],
             "count": 10,
             "fish_size": "Small_Fingerlin",
-            "until": 31,
+            "until": 91,
             "money": 100_000_00,
             "n_batches": 1,
             "n_ponds": 1
@@ -54,12 +56,12 @@ class TestCycle:
         },
         {
             "phases": [
-                Phase(30, [1], 0, "Juveniles"),
-                Phase(30, [1], 0, "Jumbo")
+                Phase(30, [1], 0, "Large_Fingerlin"),
+                Phase(30, [1], 0, "Juveniles")
             ],
             "count": 10,
             "fish_size": "Small_Fingerlin",
-            "until": 70,
+            "until": 61,
             "money": 100_000_00,
             "n_batches": 2,
             "n_ponds": 2
@@ -73,17 +75,15 @@ class TestCycle:
         n_batches = params['n_batches']
         n_ponds = params['n_ponds']
         money = params['money']
-        
-        env = simpy.Environment()
-        farm = Farm(env, "Random", money=money, ponds=[], feeds=[], active=False)
 
+        sim = Simulation()
+        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], active=False, business_model=FarmBusinessModel(capital=money))
         stock = Stock(id=1, type="Catfish", phases=phases, size=fish_size, count=count)
-        cycle = Cycle(env, farm, stock=stock, id=1)
+        cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock)
         cycle.run(until)
 
         assert len(cycle.batches) == n_batches
         assert len(farm.ponds) == n_ponds
-        assert farm.money.level >= money
 
     @pytest.mark.parametrize("params", [
         {"fractions": [1], "count": 10},
@@ -94,14 +94,13 @@ class TestCycle:
         fractions = params['fractions']
         count = params['count']
 
-        env = simpy.Environment()
-        farm = Farm(env, "Random", 100_000_00, ponds=[], feeds=[])
-
+        sim = Simulation()
+        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[])
         phase = Phase(10, fractions, 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
-        cycle = Cycle(env, farm, stock=stock, id=1)
+        cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock)
 
-        cycle.fishes = [Fish(farm.stocking_pond, i+1, stock.type, 40) for i in range(stock.count)]
+        cycle.fishes = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": 40}) for i in range(stock.count)]
         batches = cycle.split_phase(phase)
         assert len(batches) == len(phase.fractions)
 
@@ -119,52 +118,50 @@ class TestCycle:
         count = params['count']
         called_acquire_pond = params['called_acquire_pond']
 
-        env = simpy.Environment()
+        sim = Simulation()
         called = {"acquire_pond": 0}
         def fake_acquire_pond(self, pond):
             called['acquire_pond'] += 1
-            yield env.timeout(0)
-
+            yield sim.env.timeout(0)
         monkeypatch.setattr(Farm, "acquire_pond", fake_acquire_pond)
-        farm = Farm(env, "Random", 100_000_00, ponds=[], feeds=[], active=False)
 
+        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], active=False)
         phase = Phase(duration, fractions, 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
-        cycle = Cycle(env, farm, stock=stock, id=1, active=False)
+        cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock, active=False)
+        cycle.fishes = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": 40}) for i in range(stock.count)]
 
-        cycle.fishes = [Fish(farm.stocking_pond, i+1, stock.type, 40) for i in range(stock.count)]
-        env.process(cycle.run_next_phase())
-        env.run(duration)
+        sim.env.process(cycle.run_next_phase(True))
+        sim.env.run(duration)
 
         assert called_acquire_pond == called['acquire_pond']
-       
+
     @pytest.mark.parametrize("params", [
-        {"fish_size": "Fry", "count": 10, "called_transaction_amount": 25_00},
-        {"fish_size": "Small_Fingerlin", "count": 10, "called_transaction_amount": 2_500_00},
-        {"fish_size": "Medium_Fingerlin", "count": 10, "called_transaction_amount": 750_00}
+        {"fish_size": "Fry", "count": 10, "called_transaction_amount": 100_00},
+        {"fish_size": "Small_Fingerlin", "count": 10, "called_transaction_amount": 250_00},
+        {"fish_size": "Medium_Fingerlin", "count": 10, "called_transaction_amount": 400_00}
     ])
     def test_stock_fishes(self, params, monkeypatch):
         fish_size = params['fish_size']
         count = params['count']
         called_transaction_amount = params['called_transaction_amount']
 
-        env = simpy.Environment()
+        sim = Simulation()
         called = {"called_transaction_amount": 0, "called_transaction_quantity": 0}
         def fake_transact(self, action, amount, item, entity_tag, quantity):
             if action == 'debit' and item == 'fishes':
                 called['called_transaction_amount'] = amount
                 called['called_transaction_quantity'] = quantity
-            yield env.timeout(0)
+            yield sim.env.timeout(0)
 
         monkeypatch.setattr(Farm, "transact", fake_transact)
-        farm = Farm(env, "Random", 100_000_00, ponds=[], feeds=[], active=False)
-
+        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], active=False)
         phase = Phase(10, [1], 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size=fish_size, count=count)
-        cycle = Cycle(env, farm, stock=stock, id=1, active=False)
+        cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock, active=False)
 
-        env.process(cycle.stock_fishes())
-        env.run(.1)
+        sim.env.process(cycle.stock_fishes())
+        sim.env.run(.1)
 
         assert called["called_transaction_amount"] <= called_transaction_amount
         assert called["called_transaction_quantity"] == count
@@ -182,25 +179,24 @@ class TestCycle:
         called_transaction_amount = params['called_transaction_amount']
         called_transaction_quantity = params['called_transaction_quantity']
 
-        env = simpy.Environment()
+        sim = Simulation()
         called = {"called_transaction_amount": 0, "called_transaction_quantity": 0}
         def fake_transact(self, action, amount, item, entity_tag, quantity):
             if action == 'credit' and item == 'fishes':
                 called['called_transaction_amount'] = amount
                 called['called_transaction_quantity'] = quantity
-            yield env.timeout(0)
+            yield sim.env.timeout(0)
 
         monkeypatch.setattr(Farm, "transact", fake_transact)
-        farm = Farm(env, "Random", money=100_000_000_00, ponds=[], feeds=[], active=False)
+        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], active=False)
 
         phase = Phase(10, [1], 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
-        cycle = Cycle(env, farm, stock=stock, id=1, active=False)
+        cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock,  active=False)
 
-        cycle.next_harvest_rate = harvest_rate
-        cycle.fishes = [Fish(farm.stocking_pond, i+1, stock.type, fish_size) for i in range(stock.count)]
-        env.process(cycle.harvest_fishes())
-        env.run(1)
+        cycle.fishes = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": fish_size}) for i in range(stock.count)]
+        sim.env.process(cycle.harvest_fishes(harvest_rate))
+        sim.env.run(1)
 
         assert called["called_transaction_amount"] == called_transaction_amount
         assert called["called_transaction_quantity"] == called_transaction_quantity

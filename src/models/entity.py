@@ -1,57 +1,39 @@
-import simpy
-import numpy as np
-import pandas as pd
-from datetime import datetime
-from os import makedirs
+from typing import Callable, Optional
 
-from models.simulation import SimulationModel
-from utils.logger import Logger
+from faker import Generator
+from pydantic import Field, computed_field
+from simpy.core import SimTime
+from simpy.events import Process
+from simpy import Container
+
+from src.utils.logger import Logger
 
 class Entity(Logger):
-    def __init__(self, sim: SimulationModel, type: str, id: int, verbose: int = 0, active=True):
-        super().__init__(sim.env, f"{type}_{id}", verbose=verbose)
-        self.sim = sim
-        self.type = type
-        self.id = id
+    active: bool = Field(default=True, description="The active status of the entity")
+    processes: dict[str, Process] = Field(default_factory=dict, description="The entity processes")
+    containers: dict[str, Container] = Field(default_factory=dict, description="The entity containers")
+    schedules: dict[str, float] = Field(default_factory=dict, description="Schedules for processes")
+    options: dict = Field(default_factory=dict, description="Optional parameters")
+    start_time: SimTime = Field(default=0, description="The time entity was initialized")
+    stop_time: SimTime = Field(default=0, description="The time entity was terminated")
         
-        np.random.seed(self.sim.seed)
-        self.rng = np.random
-
-        self.tables = {}
-        self.active = active
-        self.start_time = self.env.now
-
-        self.plug_in()
-
-    def plug_in(self):
-        type_entities: list = self.sim.entitles.get(self.type, [])
-        type_entities.append(self)
-        self.sim.entitles[self.type] = type_entities
+    def model_post_init(self, __context):
+        super().model_post_init(__context)
 
     def run(self, until):
         """Run the entity"""
         if not self.active:
             return
-
         self.env.run(until=until)   
-
-    def get_frame(self, domain: str):
-        table = self.tables.get(domain, None)
-        if not table:
-            return None
-        
-        return pd.DataFrame(table)
 
     def get_age(self):
         return int(self.env.now - self.start_time)
 
-    def save(self):        
-        now = self.sim.timestamp.strftime("%d_%m_%Y_%H_%M_%S")
-        path = f'../data/simulations_{now}'
-        makedirs(path, exist_ok=True)
+    def terminate(self):
+        yield self.env.timeout(0)
+        self.active = False
 
-        for table in self.tables.keys():
-            frame = self.get_frame(table)
-            if frame is None:
-                continue
-            frame.to_csv(f"{path}/{self.tag}_{table}.csv")
+    def terminate_after(self, delay: float):
+        yield self.env.timeout(delay)
+        yield self.env.process(self.terminate())
+    

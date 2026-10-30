@@ -1,3 +1,4 @@
+from pydantic import ValidationError
 import pytest
 import simpy
 
@@ -5,21 +6,21 @@ from src.simulations.feed import Feed
 
 class TestFeed:
     @pytest.mark.parametrize("params", [
-        {"env": simpy.Environment(), "name": "Random", "size": 1.0},
-        {"env": simpy.Environment(), "name": "Random", "size": 1.0, "floats": True},
-        {"env": simpy.Environment(), "name": "Random", "size": 1.0, "floats": False, "rate": .9}
+        {"id": "1", "name": "Random", "size": 1.0},
+        {"id": "1", "name": "Random", "size": 1.0, "floats": True},
+        {"id": "1", "name": "Random", "size": 1.0, "floats": False, "rate": .9}
     ])
     def test_create_feed(self, params):
         feed = Feed(**params)
         assert feed.name == 'Random'
-        assert feed.tag == f'Random_1.0'
+        assert feed.tag == f'Feed_1'
 
     @pytest.mark.parametrize("params", [
         {},
-        {"env": simpy.Environment()}
+        {"id": 1}
     ])
     def test_fail_create_invalid_feed(self, params):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValidationError):
             Feed(**params)
 
     @pytest.mark.parametrize("params", [
@@ -35,16 +36,14 @@ class TestFeed:
         until = params['until']
         left = params['left']
 
-        env = simpy.Environment()
-        feed = Feed(env, name="Random", size=1.0)   
+        feed = Feed(name="Random", size=1.0)   
 
         feed.refill(refill)
-        env.process(feed.consume(consume))
-        env.run(until=until)
+        feed.env.process(feed.consume(consume))
+        feed.env.run(until=until)
 
         q = feed.get_quantity()
         assert q == left
-
 
     @pytest.mark.parametrize("params", [
         [10],
@@ -52,7 +51,7 @@ class TestFeed:
         [10, 10000],
     ])
     def test_refill_feed(self, params):
-        feed = Feed(env=simpy.Environment(), name="Random", size=1.0)       
+        feed = Feed(name="Random", size=1.0)       
         for i in params:
             feed.refill(i)
 
@@ -64,7 +63,7 @@ class TestFeed:
         [10, 10],
     ])
     def test_consume_feed(self, params):
-        feed = Feed(env=simpy.Environment(), name="Random", size=1.0)
+        feed = Feed(name="Random", size=1.0)
         feed.refill(100)
 
         for i in params:
@@ -81,10 +80,9 @@ class TestFeed:
         100
     ])
     def test_expire_feed(self, params):
-        env = simpy.Environment()
-        feed = Feed(env=env, name="Random", size=1.0)
+        feed = Feed(name="Random", size=1.0)
         feed.refill(10)
-        env.run(until=params)
+        feed.env.run(until=params)
 
         if params > 90:
             assert len(feed.batches) == 0
@@ -102,8 +100,7 @@ class TestFeed:
         weight = params['weight']
         feed_cost = params["feed_cost"]
 
-        env = simpy.Environment()
-        feed = Feed(env=env, name="Random", **feed_params)
+        feed = Feed(name="Random", **feed_params)
         cost = feed.get_cost(weight)
         assert cost == feed_cost
         

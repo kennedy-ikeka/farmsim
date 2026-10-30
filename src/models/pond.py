@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from typing import Optional
 
-import simpy
+from pydantic import Field, computed_field
+from simpy.core import SimTime
 from typing_extensions import Generator, Literal
 
-from src.models.animal import FishModel
-from src.models.entity import Entity
+from src.models.asset import Asset
+from src.models.fish import FishModel
+from src.utils.conversion import DAY_IN_HOURS, HOUR_IN_MINUTES
 
 POND_TYPES = Literal[
     "Earthen_Pond", 
@@ -28,14 +30,38 @@ POND_TYPE_DETAILS = {
 
 POND_RENTAL_INTERVAL = 30
 
-class PondModel(Entity):
-    fishes: list[FishModel]
-    feed: simpy.Container
-    health: simpy.Container
-    volume: float
-    since: float
-    duration: int
+class PondModel(Asset):
+    fishes: list[FishModel] = Field(default_factory=list, description="Fishes in the pond")
+    length: float = Field(default=1.0, description="The length of the pond")
+    width: float = Field(default=1.0, description="The width of the pond")
+    depth: float = Field(default=1.0, description="The depth of the pond")
+    density: float = Field(default=1.0, description="The depth of the pond")
+    aerated: bool = Field(default=False, description="The aeration status of the pond")
+    duration: int = Field(default=0, description="The duration of the pond")
+    type: POND_TYPES = Field(..., description="The type of pond")    
+    acquired_at: Optional[SimTime] = Field(default=None, description="Time when pond was aqcuired")
+    kind: str = Field(default="Pond")
+       
+    @computed_field
+    @property
+    def volume(self) -> float:
+        return self.length * self.width * self.depth
 
+    @computed_field
+    @property
+    def capacity(self) -> float:
+        return self.volume * self.density
+
+    @computed_field
+    @property
+    def details(self) -> PondDetail:
+        return POND_TYPE_DETAILS[self.type]
+
+    @computed_field
+    @property
+    def drain_speed(self) -> float:
+        return self.rng.integers(30, 40) / HOUR_IN_MINUTES / DAY_IN_HOURS  # drain speed in days
+    
     def get_feed_availability(self) -> float:
         ...
         
