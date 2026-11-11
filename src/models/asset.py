@@ -24,8 +24,11 @@ class Asset(Entity):
         type_entities[self.id]  = self
         self.sim.assets[self.kind] = type_entities 
 
-    def get_frame(self, domain: str):
-        table = self.tables.get(domain, None)
-        if not table:
-            return None
-        return pd.DataFrame(table)
+    def plug_out(self):
+        ...
+
+    def get_state(self, exclude: set):
+        return self.model_dump(
+            exclude_computed_fields=True,
+            exclude={"sim", "env", "processes", "conatainers", "schedules", *exclude}
+        )

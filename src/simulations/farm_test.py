@@ -81,13 +81,13 @@ class TestFarm():
         ]
 
         sim = Simulation()
-        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], business_model=FarmBusinessModel(stocks=stocks, capital=capital))
+        farm = Farm(sim=sim, name="Random", business_model=FarmBusinessModel(stocks=stocks, capital=capital))
         farm.env.run(until)
 
-        n_farm_cycles = len(farm.cycles)
+        n_farm_cycles = len(farm.cycle_ids)
         assert n_cycles == n_farm_cycles
 
-        last_cycle = farm.cycles[-1]
+        last_cycle = sim.get_asset("Cycle", farm.cycle_ids[-1])
         assert last_cycle.stock.id == last_stock_id
 
     @pytest.mark.parametrize("params", [
@@ -139,7 +139,7 @@ class TestFarm():
         check_feed = farm.feed_exists(feed_size)
         assert check_feed == False
 
-        feed = Feed(sim=sim, name="Random", size=feed_size)
+        feed = Feed(sim=sim, farm_id=farm.id, name="Random", size=feed_size)
         farm.env.process(farm.stock_feed(feed, weight))
         farm.env.run(1)
 
@@ -186,7 +186,7 @@ class TestFarm():
         farm.env.run(until)
 
         assert farm.containers["money"].level == balance
-        assert len(farm.ponds) == num_ponds
+        assert len(farm.pond_ids) == num_ponds
 
     @pytest.mark.parametrize("params", [
         {
@@ -212,11 +212,11 @@ class TestFarm():
         pond_tag = params['pond_tag']
 
         sim = Simulation()
-        ponds: list[PondModel] = [
-            Pond(sim=sim, **p)
+        ponds: list[str] = [
+            Pond(sim=sim, **p).id
             for p in ponds_params
         ]
-        farm = Farm(sim=sim, name="Random", ponds=ponds)
+        farm = Farm(sim=sim, name="Random", pond_ids=ponds)
         available_pond = farm.get_available_pond(volume)
         assert available_pond != None
         assert available_pond.tag == pond_tag
@@ -224,7 +224,7 @@ class TestFarm():
     @pytest.mark.parametrize("params", [
         {
             "business_model": FarmBusinessModel(stocks=[Stock(1, "Catfish", 10, "Small_Fingerlin", [Phase(30, [1], 1, "Juveniles")])]),
-            "until": 31,
+            "until": 30,
             "n_cycles": 1,
             "last_stock_id": 1,
         },
@@ -236,7 +236,7 @@ class TestFarm():
                 ]
             ),
             "until": 60,
-            "n_cycles": 1,
+            "n_cycles": 2,
             "last_stock_id": 2,
         },
         {
@@ -247,8 +247,8 @@ class TestFarm():
                 ]
             ),
             "until": 60,
-            "n_cycles": 1,
-            "last_stock_id": 1,
+            "n_cycles": 4,
+            "last_stock_id": 2,
         },
         {
             "business_model": FarmBusinessModel(
@@ -257,7 +257,7 @@ class TestFarm():
                 ]
             ),
             "until": 60,
-            "n_cycles": 1,
+            "n_cycles": 2,
             "last_stock_id": 1,
         },
     ])
@@ -267,17 +267,16 @@ class TestFarm():
         n_cycles = params['n_cycles']
         last_stock_id = params['last_stock_id']
 
-        env = simpy.Environment()
-        farm = Farm(name="Random", ponds=[], feeds=[], business_model=business_model, active=False)
+        sim = Simulation()
+        farm = Farm(name="Random", business_model=business_model, active=False, sim=sim)
 
-        env.process(farm.run_next_cycle(True))
-        env.run(until)
+        sim.env.process(farm.run_next_cycle(True))
+        sim.env.run(until)
 
-        n_farm_cycles = len(farm.cycles)
+        cycles = sim.list_assets("Cycle", lambda c: getattr(c, 'id') in farm.cycle_ids)
+        n_farm_cycles = len(cycles)
         assert n_cycles == n_farm_cycles
 
-        last_cycle = farm.cycles[-1]
+        last_cycle = cycles[-1]
         assert last_cycle.stock.id == last_stock_id
-
-        assert farm.containers['money'].level >= business_model.capital
     

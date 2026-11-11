@@ -1,14 +1,34 @@
-from typing import Callable, Optional
+from typing import Callable
+from uuid import uuid4
 
-from faker import Generator
-from pydantic import Field, computed_field
-from simpy.core import SimTime
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+from simpy.core import SimTime, Environment
 from simpy.events import Process
 from simpy import Container
 
-from src.utils.logger import Logger
+class Simlog(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    env: Environment = Field(default_factory=Environment, description="The simulation environment")
+    kind: str = Field(..., description="The kind of entity")
+    id: str = Field(default_factory=lambda: uuid4().hex, description="The id of the entity")
+    verbose: int = Field(default=0, description="The log level", ge=0, le=3)
 
-class Entity(Logger):
+    @computed_field
+    @property
+    def tag(self) -> str:
+        return f"{self.kind}_{self.id}"
+
+    def error(self, message):
+        if self.verbose >= 1:
+            print(f"[Error] [{self.env.now}] {self.tag}: {message}")  
+
+    def info(self, message: str):
+        if self.verbose >= 2:
+            print(f"[Info] [{self.env.now}] {self.tag}: {message}")    
+
+
+class Entity(Simlog):
     active: bool = Field(default=True, description="The active status of the entity")
     processes: dict[str, Process] = Field(default_factory=dict, description="The entity processes")
     containers: dict[str, Container] = Field(default_factory=dict, description="The entity containers")
@@ -33,7 +53,7 @@ class Entity(Logger):
         yield self.env.timeout(0)
         self.active = False
 
-    def terminate_after(self, delay: float):
+    def schedule(self, delay: float, fn: Callable, kwargs: dict = {}):
         yield self.env.timeout(delay)
-        yield self.env.process(self.terminate())
+        yield self.env.process(fn(**kwargs))
     

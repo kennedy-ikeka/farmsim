@@ -11,20 +11,20 @@ feeding_logs = []
 class Fish(FishModel):
     """A fish entity in the the simulation"""
 
-    @computed_field
-    @property
-    def pond(self) -> PondModel:
-        return self.sim.assets['Pond'][self.pond_id]
-
     def model_post_init(self, __context):
         super().model_post_init(__context)
         self.containers["weight"] = Container(self.env, init=self.options.get('weight', self.rng.integers(0, 2000)))
         self.containers["stomach"] = Container(self.env, capacity=100, init=self.options.get('stomach', 100))
         self.containers["health"] = Container(self.env, capacity=100, init=self.options.get('health', 100))
 
+        pond = self.get_pond()
+        pond.fish_ids.append(self.id)
+
         self.set_stomach_weight()
-        self.pond.fishes.append(self)
         self.processes['existence'] = self.env.process(self.exist())
+
+    def get_pond(self) -> PondModel:
+        return self.sim.get_asset("Pond", self.pond_id)
 
     def set_stomach_weight(self):
         all_sizes = list(FISH_SIZE_DETAILS.values())
@@ -48,7 +48,8 @@ class Fish(FishModel):
         return self.get_hunger_rate() * np.sqrt(self.containers['weight'].level) * health_state
 
     def get_feeding_rank(self) -> float:
-        rates = sum(f.get_hunt_rate() for f in self.pond.fishes)
+        pond = self.get_pond()
+        rates = sum(f.get_hunt_rate() for f in pond.get_fishes())
         if rates == 0:
             return 0
         hunt_rate = self.get_hunt_rate()
@@ -78,7 +79,8 @@ class Fish(FishModel):
         quench_rate = can_eat / hunger_weight
         quench_level = quench_rate * hunger_level
 
-        yield self.pond.containers['feed'].get(can_eat) # Catch feed
+        pond = self.get_pond()
+        yield pond.containers['feed'].get(can_eat) # Catch feed
         self.info(f"Eat feed weighing {can_eat}")
 
         yield self.containers['stomach'].put(quench_level) # Quench hunger
@@ -87,18 +89,14 @@ class Fish(FishModel):
         weight_gained = can_eat/fcr
         yield self.containers['weight'].put(weight_gained) # Gain weight
         self.info(f"Gained weight by ({(weight_gained * 100)/self.containers['weight'].level:.2f}% )")
-
-        self.metric("feeding", { 
-            "id": self.id,
+        self.feeding.append({ 
+            "time": self.env.now,
             "hunger_level": round(hunger_level),
             "hunger_weight": round(hunger_weight, 2),
             "feed_weight": round(can_eat, 2), 
             "quench_rate": round(quench_rate * 100),
             "stomach_level": round(self.containers['stomach'].level),
-            "weight": round(self.containers['weight'].level),
-            "stock_id": self.cycle_id,
-            "batch_id": self.batch_id,
-            "farm_id": self.farm_id
+            "weight": round(self.containers['weight'].level)
         })
 
     def hunt(self):
@@ -108,10 +106,11 @@ class Fish(FishModel):
             yield self.env.timeout(t_hunt)
             self.info(f"Hunting for food in the pond")
 
-            feeding_rank = self.get_feeding_rank()        
-            hunt_weight = self.pond.containers['feed'].level * feeding_rank
+            feeding_rank = self.get_feeding_rank()  
+            pond = self.get_pond()      
+            hunt_weight = pond.containers['feed'].level * feeding_rank
 
-            self.info(f"Caught feed weighing {self.pond.containers['feed'].level}")
+            self.info(f"Caught feed weighing {pond.containers['feed'].level}")
             yield self.env.process(self.eat(feed_weight=hunt_weight, fcr=1)) # Eat
 
     def excrete(self, excrete_weight):
@@ -131,10 +130,11 @@ class Fish(FishModel):
         yield self.containers['weight'].get(weight_lost) # Lose weight
         self.info(f"Lost weight by ({(weight_lost * 100)/self.containers['weight'].level:.2f}% )")
 
-        contamination_rate = (to_kilo(can_waste) ** (1/3)) / self.pond.volume
-        health_lost = self.pond.containers['health'].level * contamination_rate
+        pond = self.get_pond()
+        contamination_rate = (to_kilo(can_waste) ** (1/3)) / pond.volume
+        health_lost = pond.containers['health'].level * contamination_rate
         if health_lost > 0:
-            self.pond.containers['health'].get(health_lost)
+            pond.containers['health'].get(health_lost)
         
     def digest(self):
         """Release excrements after eating"""
@@ -150,13 +150,13 @@ class Fish(FishModel):
             self.set_stomach_weight()
 
     def pond_health_effect(self):
-        return np.mean([self.pond.containers['health'].level, self.containers['health'].level])
+        pond = self.get_pond()
+        return np.mean([pond.containers['health'].level, self.containers['health'].level])
 
     def get_starving_rate(self):
         starving_rate = 0
         if self.containers['stomach'].level <= 1:
-            feeding_history = self.tables.get('feeding', [])
-            last_feed_at = feeding_history[-1]['time'] if len(feeding_history) else 0
+            last_feed_at = self.feeding[-1]['time'] if len(self.feeding) else 0
             starving_rate = self.env.now - last_feed_at
         return starving_rate
 

@@ -31,7 +31,7 @@ POND_TYPE_DETAILS = {
 POND_RENTAL_INTERVAL = 30
 
 class PondModel(Asset):
-    fishes: list[FishModel] = Field(default_factory=list, description="Fishes in the pond")
+    fish_ids: list[str] = Field(default_factory=list, description="Fishes in the pond")
     length: float = Field(default=1.0, description="The length of the pond")
     width: float = Field(default=1.0, description="The width of the pond")
     depth: float = Field(default=1.0, description="The depth of the pond")
@@ -61,7 +61,10 @@ class PondModel(Asset):
     @property
     def drain_speed(self) -> float:
         return self.rng.integers(30, 40) / HOUR_IN_MINUTES / DAY_IN_HOURS  # drain speed in days
-    
+
+    def get_fishes(self) -> list[FishModel]:
+        ...
+        
     def get_feed_availability(self) -> float:
         ...
         
@@ -75,4 +78,7 @@ class PondModel(Asset):
         ...
 
     def contaminate(self) -> Generator:
+        ...
+
+    def list_fishes(self) -> list[FishModel]:
         ...

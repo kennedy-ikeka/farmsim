@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 from typing_extensions import Generator, Literal
 
 from src.models.asset import Asset
@@ -53,9 +53,9 @@ class FarmBusinessModel(BaseModel):
 class FarmModel(Asset):
     name: str = Field(..., description="The name of the farm")
     business_model: FarmBusinessModel = Field(default_factory=FarmBusinessModel, description="The business model of the farm")
-    ponds: list[PondModel] = Field(default_factory=list, description="The ponds for the farm")
-    feeds: list[FeedModel] = Field(default_factory=list, description="The feeds for the farm")
-    cycles: list[CycleModel] = Field(default_factory=list, description="The cycles implemented by the farm")
+    pond_ids: list[str] = Field(default_factory=list, description="The ponds for the farm")
+    feed_ids: list[str] = Field(default_factory=list, description="The feeds for the farm")
+    cycle_ids: list[str] = Field(default_factory=list, description="The cycles implemented by the farm")
     stocking_pond: PondModel = Field(default_factory=lambda data: PondModel(sim=data["sim"], type="Portable_Pond"), description="The ponds stocking portable pond")
     kind: str = Field(default="Farm")
     

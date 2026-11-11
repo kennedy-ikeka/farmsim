@@ -49,8 +49,8 @@ class TestFish():
             Fish(sim=sim, pond_id=pond.id, **p)
 
         pond.env.run(1)
-        fish_1 = pond.get_fish_by_id("1")
-        fish_2 = pond.get_fish_by_id("2")
+        fish_1 = sim.get_asset("Fish", "1")
+        fish_2 = sim.get_asset("Fish", "2")
 
         assert fish_1.containers['weight'].level < fish_2.containers['weight'].level         
 
@@ -224,7 +224,7 @@ class TestFish():
             fish_params = p["fish_params"]
             hunt_rate = p["hunt_rate"]
             rank = p["rank"]
-            fish = pond.get_fish_by_id(fish_params["id"])
+            fish: Fish = sim.get_asset("Fish", fish_params["id"])
 
             f_hunt_rate = fish.get_hunt_rate()
             assert hunt_rate == round(f_hunt_rate, 2)

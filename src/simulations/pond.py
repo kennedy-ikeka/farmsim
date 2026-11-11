@@ -84,9 +84,8 @@ class Pond(PondModel):
         ...
         # TODO
 
-    def get_fish_by_id(self, fish_id: str):
-        found = filter(lambda f: f.id == fish_id, self.fishes)
-        return next(found) 
+    def get_fishes(self) -> list:
+        return self.sim.list_assets("Fish", lambda f: getattr(f, "id") in self.fish_ids)
 
     def exist(self):
         yield self.env.timeout(0)

@@ -12,6 +12,7 @@ class AnimalModel(Asset):
     cycle_id: Optional[str] = Field(default=None, description="The cycle id of the animal")
     batch_id: Optional[str] = Field(default=None, description="The batch id of the animal")
     farm_id: Optional[str] = Field(default=None, description="The farm id of the animal")
+    feeding: list[dict] = Field(default_factory=list, description="The feeding history")
     kind: str = Field(default="Animal")
 
     def get_hunger_rate(self) -> float:

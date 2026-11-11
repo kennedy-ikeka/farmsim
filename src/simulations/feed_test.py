@@ -1,6 +1,5 @@
 from pydantic import ValidationError
 import pytest
-import simpy
 
 from src.simulations.feed import Feed
 

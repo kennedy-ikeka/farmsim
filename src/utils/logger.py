@@ -1,36 +1,33 @@
-from uuid import uuid4
+import logging
+import sys
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
-from simpy.core import Environment
-
-class Logger(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] - [%(message)s]"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
     
-    env: Environment = Field(default_factory=Environment, description="The simulation environment")
-    kind: str = Field(..., description="The kind of entity")
-    id: str = Field(default_factory=lambda: uuid4().hex, description="The id of the entity")
-    verbose: int = Field(default=0, description="The log level", ge=0, le=3)
-    tables: dict[str, list[dict]] = Field(default_factory=dict, description="The tables for the entity")
 
-    @computed_field
-    @property
-    def tag(self) -> str:
-        return f"{self.kind}_{self.id}"
+def get_logger(name: str = 'app') -> logging.Logger:
+    """Create or retrieve a configured logger with console and file handlers.
 
-    def error(self, message):
-        if self.verbose >= 1:
-            print(f"[Error] [{self.env.now}] {self.tag}: {message}")  
+    Sets up a logger with both console output and rotating file handler.
+    Each log entry includes request ID for tracing.
 
-    def info(self, message: str):
-        if self.verbose >= 2:
-            print(f"[Info] [{self.env.now}] {self.tag}: {message}")    
+    Args:
+        name: Name of the logger instance
 
-    def metric(self, domain: str, data: dict):
-        table = self.tables.get(domain, None)
-        if not table:
-            self.tables[domain] = []
-            table = self.tables[domain]
+    Returns:
+        Configured Logger instance with formatters and handlers
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
 
-        table.append({"time": self.env.now, "tag": self.tag, **data})
-        if self.verbose >= 3:
-            print(f"[Metric] [{self.env.now}] {self.tag}: {domain}: {data}")  
+    if logger.handlers:
+        return logger
+
+    formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT)
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    logger.propagate = False
+
+    return logger

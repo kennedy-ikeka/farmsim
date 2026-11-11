@@ -8,6 +8,7 @@ from src.simulations.farm import Farm
 from src.simulations.fish import Fish
 from src.simulations.simulation import Simulation
 
+
 class TestCycle:
     @pytest.mark.parametrize("params", [
         {"id": "1"},
@@ -15,7 +16,7 @@ class TestCycle:
     ])
     def test_create_cycle(self, params):
         sim = Simulation()
-        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[])
+        farm = Farm(sim=sim, name="Random")
         stock = Stock(id=1, type="Catfish", phases=[], size="Small_Fingerlin", count=1000)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock, **params)
         assert cycle.tag == f"Cycle_{params['id']}"
@@ -25,7 +26,7 @@ class TestCycle:
     ])
     def test_fail_create_invalid_cycle(self, params):
         sim = Simulation()
-        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[])
+        farm = Farm(sim=sim, name="Random")
         stock = Stock(id=1, type="Catfish", phases=[], size="Small_Fingerlin", count=1000)
         with pytest.raises(ValidationError):
             Cycle(sim=sim, farm_id=farm.id, stock=stock, **params)
@@ -62,7 +63,7 @@ class TestCycle:
             "count": 10,
             "fish_size": "Small_Fingerlin",
             "until": 61,
-            "money": 100_000_00,
+            "money": 1_000_000_00,
             "n_batches": 2,
             "n_ponds": 2
         }
@@ -77,13 +78,13 @@ class TestCycle:
         money = params['money']
 
         sim = Simulation()
-        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], active=False, business_model=FarmBusinessModel(capital=money))
+        farm = Farm(sim=sim, name="Random", active=False, business_model=FarmBusinessModel(capital=money))
         stock = Stock(id=1, type="Catfish", phases=phases, size=fish_size, count=count)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock)
         cycle.run(until)
 
         assert len(cycle.batches) == n_batches
-        assert len(farm.ponds) == n_ponds
+        assert len(farm.pond_ids) == n_ponds
 
     @pytest.mark.parametrize("params", [
         {"fractions": [1], "count": 10},
@@ -95,12 +96,12 @@ class TestCycle:
         count = params['count']
 
         sim = Simulation()
-        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[])
+        farm = Farm(sim=sim, name="Random")
         phase = Phase(10, fractions, 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock)
 
-        cycle.fishes = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": 40}) for i in range(stock.count)]
+        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": 40}).id for i in range(stock.count)]
         batches = cycle.split_phase(phase)
         assert len(batches) == len(phase.fractions)
 
@@ -125,11 +126,11 @@ class TestCycle:
             yield sim.env.timeout(0)
         monkeypatch.setattr(Farm, "acquire_pond", fake_acquire_pond)
 
-        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], active=False)
+        farm = Farm(sim=sim, name="Random", active=False)
         phase = Phase(duration, fractions, 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock, active=False)
-        cycle.fishes = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": 40}) for i in range(stock.count)]
+        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": 40}).id for i in range(stock.count)]
 
         sim.env.process(cycle.run_next_phase(True))
         sim.env.run(duration)
@@ -155,7 +156,7 @@ class TestCycle:
             yield sim.env.timeout(0)
 
         monkeypatch.setattr(Farm, "transact", fake_transact)
-        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], active=False)
+        farm = Farm(sim=sim, name="Random", active=False)
         phase = Phase(10, [1], 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size=fish_size, count=count)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock, active=False)
@@ -188,13 +189,13 @@ class TestCycle:
             yield sim.env.timeout(0)
 
         monkeypatch.setattr(Farm, "transact", fake_transact)
-        farm = Farm(sim=sim, name="Random", ponds=[], feeds=[], active=False)
+        farm = Farm(sim=sim, name="Random", active=False)
 
         phase = Phase(10, [1], 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock,  active=False)
 
-        cycle.fishes = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": fish_size}) for i in range(stock.count)]
+        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": fish_size}).id for i in range(stock.count)]
         sim.env.process(cycle.harvest_fishes(harvest_rate))
         sim.env.run(1)
 

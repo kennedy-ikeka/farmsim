@@ -1,62 +1,66 @@
 import os
-from typing import Optional
+from typing import Any, Callable, Mapping, Optional
 from pydantic import Field
-import numpy as np, pandas as pd
+from pandas import DataFrame, concat, read_csv
 import json
 
+from models.asset import Asset
 from src.models.farm import FarmBusinessModel
 from src.models.simulation import SimulationModel
 from src.simulations.farm import Farm
 
 
 class Simulation(SimulationModel):
-    farms: dict[str, FarmBusinessModel] = Field(default_factory=dict, description="The business models of the farms")
+    business_models: dict[str, FarmBusinessModel] = Field(default_factory=dict, description="The business models of the farms")
 
     def model_post_init(self, __context) -> None:
         super().model_post_init(__context)
-
-
-        for name, business_model in self.farms.items():
+        for name, business_model in self.business_models.items():
             self.spawn_farm(name, business_model)
 
-        self.processes["checkpoint"] = self.env.process(self.checkpoint())
+        self.processes["existence"] = self.env.process(self.exist())
 
-    def checkpoint(self):
-        interval = self.options.get("checkpoint_interval", None)
-        if interval is None:
-            return
-        
+    def exist(self):
+        interval = self.options.get("checkpoint_interval", 1)
         while self.active:
             yield self.env.timeout(interval)
-            self.save()
             self.info(f"Simulation at: {self.get_age()}")
 
-    def run(self, until):
-        """Run the simulation"""
-        self.env.run(until=until) 
+            if self.store:
+                self.save()
 
-    def get_entity_frames(self, entity_name: str):
-        # merge related entities as one
-        asset_list = self.assets.get(entity_name, [])
-        entity_frames: dict[str, pd.DataFrame] = {}
+    def get_asset[T: Asset](self, asset_type: str, id: str) -> T:
+        asset_collection = self.assets.get(asset_type, {})
+        asset = asset_collection.get(id, None)
+        if asset is None:
+            raise ValueError("Asset not found")
+        return asset
+    
+    def list_assets[T: Asset](self, asset_type: str, where: Optional[Callable[[T], bool]]=None) -> list[T]:
+        collection = self.assets.get(asset_type, {})
+        if not where:
+            return list(collection.values())
+        
+        return [
+            asset
+            for asset in collection.values()
+            if where(asset)
+        ]
 
-        for asset in asset_list:
-            for table_name in asset.tables.keys():
-                # get entities table data
-                frame = asset.get_frame(table_name)
-                if frame is None:
-                    continue
+    def add_metric(self, domain: str, asset_id: str, data: dict):
+        table = self.datasets.get(domain, None)
+        if not table:
+            self.datasets[domain] = []
+            table = self.datasets[domain]
 
-                frames: pd.DataFrame = entity_frames.get(table_name, pd.DataFrame())
-                entity_frames[table_name] = pd.concat([frames, frame])
+        table.append({"time": self.env.now, "id": asset_id, **data})
+        self.info(f"{domain}: {data}")
 
-        return entity_frames
-
-    def set_entity_frames(self, entity_name: str, table_name: str, frames: pd.DataFrame):
-        entity_list = self.assets.get(entity_name, [])
-        for asset in entity_list:
-            df = frames[frames['tag'] == asset.tag]
-            asset.tables[table_name] = df.to_dict(orient="records")
+    def spawn_farm(self, name: str, business_model = FarmBusinessModel()):
+        self.info("Spawning Farm")
+        id = len(self.business_models.items())
+        Farm(sim=self, id=str(id), name=name, business_model=business_model)
+        self.business_models[name] = business_model
 
     def load(self, path: str):
         exists = os.path.isdir(path)
@@ -66,18 +70,16 @@ class Simulation(SimulationModel):
         files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
         csvs = filter(lambda x: x.endswith('.csv'), files)
 
-        with open(os.path.join(path, "settings.json"), "rb+") as s:
-            settings = json.load(s)
-
-            for key, value in settings["farms"].items():
-                self.spawn_farm(key, FarmBusinessModel(**value))
-
         for f in csvs:
             file = f.split(".")[0]
-            entity_name, table_name = file.split("_")
+            frame = read_csv(os.path.join(path, f))
+            self.datasets[file] = frame.to_dict(orient="records")
 
-            df = pd.read_csv(os.path.join(path, f))
-            self.set_entity_frames(entity_name, table_name, df)
+        # with open(os.path.join(path, "settings.json"), "rb+") as s:
+        #     settings = json.load(s)
+
+        #     for key, value in settings["farms"].items():
+        #         self.spawn_farm(key, FarmBusinessModel(**value))
 
     def save(self):
         """Save simulation data"""
@@ -86,26 +88,16 @@ class Simulation(SimulationModel):
         id = self.timestamp.strftime("%d_%m_%Y_%H_%M_%S")
 
         # create the path
-        path = f'../data/simulations_{id}'
+        path = os.path.join(self.out_dir, f'simulations/{id}')
         os.makedirs(path, exist_ok=True)
 
-        farms = {name: fm.model_dump() for name, fm in self.farms.items()}
-        data = self.model_dump()
-
-        with open(f"{path}/settings.json", "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-
         # save each entities data collections as a single csv
-        for entity_name in self.assets.keys():
-            entity_frames = self.get_entity_frames(entity_name)
+        for table_name, table in self.datasets.items():
+            frame = DataFrame(table).sort_values(by="time")
+            frame.to_csv(f"{path}/{table_name}.csv", index=False)
 
-            # merge as one dataframe
-            for frame_name, frame in entity_frames.items():
-                frame = frame.sort_values(by="time")
-                frame.to_csv(f"{path}/{entity_name}_{frame_name}.csv", index=False)
+        # farms = {name: fm.model_dump() for name, fm in self.farms.items()}
+        # data = self.model_dump()
 
-    def spawn_farm(self, name: str, business_model = FarmBusinessModel()):
-        self.info("Spawning Farm")
-        id = len(self.farms.items())
-        Farm(sim=self, id=str(id), name=name, business_model=business_model)
-        self.farms[name] = business_model
+        # with open(f"{path}/settings.json", "w", encoding="utf-8") as f:
+        #     json.dump(data, f, indent=2, ensure_ascii=False)

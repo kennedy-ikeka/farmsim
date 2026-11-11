@@ -10,26 +10,22 @@ from src.models.fish import COST_PER_KILO, FISH_SIZE_DETAILS, FishModel
 from src.utils.conversion import to_kilo, to_kobo, to_naira
 
 class Cycle(CycleModel):
-    fishes: list[FishModel] = Field(default_factory=list, description="The fishes for the cycle")
+    fish_ids: list[str] = Field(default_factory=list, description="The fishes for the cycle")
 
     @computed_field
     @property
     def farm(self) -> FarmModel:
-        return self.sim.assets['Farm'][self.farm_id]
+        return self.sim.get_asset("Farm", self.farm_id)
+
+    @computed_field
+    @property
+    def fishes(self) -> list[FishModel]:
+        return self.sim.list_assets("Fish", lambda x: x.id in self.fish_ids)
     
     """A full farming circle, from stocking to harvest"""
     def model_post_init(self, __context) -> None:
         super().model_post_init(__context)
-        self.fishes: list[FishModel] = []
-        self.batches: list[list[BatchModel]] = []
-
         self.processes['existence'] = self.env.process(self.exist())
-
-    def __str__(self):
-        fishes = []
-        return f"""
-        weight: {sum(f.containers['weight'].level for f in fishes)/len(fishes)}
-        """
 
     def split_phase(self, phase: Phase):
         batches: list[list[FishModel]] = []
@@ -49,7 +45,7 @@ class Cycle(CycleModel):
             next_phase = len(self.batches)
             phase = self.stock.phases[next_phase]
             fish_batches = self.split_phase(phase)
-            phase_batches: list[BatchModel] = []
+            phase_batches: list[str] = []
 
             for b in fish_batches:
                 pond = self.farm.generate_appropriate_pond(phase.target_size, len(b), phase.duration)
@@ -60,20 +56,22 @@ class Cycle(CycleModel):
                 else:
                     yield self.env.process(self.farm.acquire_pond(pond))
 
-                all_batches = [b for c in self.farm.cycles for b in c.batches]
+                cycles = self.sim.list_assets("Cycle", lambda c: getattr(c, 'id') in self.farm.cycle_ids)
+                all_batches = [b for c in cycles for b in c.batches]
                 batch_id = len(all_batches) + len(phase_batches)
+                fish_ids = [f.id for f in b]
                 batch = Batch(
                     sim=self.sim,
                     id=str(batch_id), 
                     farm_id=self.farm_id, 
                     pond_id=pond.id, 
-                    fishes=b, 
+                    fish_ids=fish_ids, 
                     duration=phase.duration, 
                     cycle_id=self.id
                 )
-                phase_batches.append(batch)
+                phase_batches.append(batch.id)
 
-            self.batches.append(phase_batches)
+            self.batch_ids.append(phase_batches)
             yield self.env.timeout(phase.duration)
             yield self.env.process(self.harvest_fishes(phase.harvest))
 
@@ -96,7 +94,7 @@ class Cycle(CycleModel):
         yield self.env.process(self.farm.transact("debit", total_price_kobo, "fishes", self.tag, num_fishes))
 
         # Create the fishes and stock them in the pond
-        self.fishes = [
+        self.fish_ids = [
             Fish(
                 sim=self.sim,
                 pond_id=self.farm.stocking_pond.id, 
@@ -105,11 +103,11 @@ class Cycle(CycleModel):
                 cycle_id=self.id, 
                 farm_id=self.farm.id,
                 options={"weight": self.rng.exponential(fish_size)}
-            )
+            ).id
             for id in range(num_fishes)
         ]
 
-        self.farm.metric("fish-stock", {
+        self.sim.add_metric("fish-stocks", self.farm_id, {
             "total_weight": round(total_weight, 2),
             "quantity": self.stock.count,
             "price": total_price_kobo,
@@ -132,7 +130,7 @@ class Cycle(CycleModel):
         total_price_kobo = to_kobo(total_price)
 
         yield self.env.process(self.farm.transact("credit", total_price_kobo, "fishes", self.tag, len(to_harvest)))
-        self.farm.metric("fish-harvest", {
+        self.sim.add_metric("fish-harvests", self.farm_id, {
             "total_weight": round(total_weight),
             "quantity": num_harvest,
             "price": total_price_kobo,
@@ -141,17 +139,16 @@ class Cycle(CycleModel):
 
         for fish in to_harvest:
             yield self.env.process(fish.terminate())
-        self.fishes = fishes[num_harvest:]
+        self.fish_ids = [f.id for f in fishes[num_harvest:]]
 
     def exist(self):
         self.start_time = self.env.now
-        yield self.env.timeout(0)
-
         if self.active:
-            self.env.process(self.terminate_after(self.stock.duration))
+            self.env.process(self.schedule(self.stock.duration, self.terminate))
 
             yield self.env.process(self.stock_fishes())
-            self.processes["run_phases"] = self.env.process(self.run_next_phase())            
+            self.processes["run_phases"] = self.env.process(self.run_next_phase())      
+        yield self.env.timeout(0)
 
     def terminate(self):
         yield self.env.process(self.harvest_fishes())

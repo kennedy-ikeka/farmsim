@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from typing_extensions import Generator
-from pydantic import Field, field_validator
+from pydantic import Field, computed_field, field_validator
 
 from src.models.asset import Asset
 from src.models.fish import FISH_SIZES, FISH_TYPES
@@ -37,8 +37,16 @@ class Stock():
 class CycleModel(Asset):   
     farm_id: str = Field(..., description="The farm id for the cycle")
     stock: Stock = Field(..., description="The cycles stocking")
-    batches: list[list[BatchModel]] = Field(default_factory=list, description="The cycle batches")
+    batch_ids: list[list[str]] = Field(default_factory=list, description="The cycle batches")
     kind: str = Field(default="Cycle")
+
+    @computed_field
+    @property
+    def batches(self) -> list[list[BatchModel]]:
+        return [
+            self.sim.list_assets("Batch", lambda x: x.id in phase_batches)
+            for phase_batches in self.batch_ids
+        ]
 
     def split_phase(self, phase: Phase):
         ...

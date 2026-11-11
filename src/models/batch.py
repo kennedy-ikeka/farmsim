@@ -8,9 +8,8 @@ from src.models.pond import PondModel
 
 
 class BatchModel(Asset):
-    farm_id: str = Field(..., description="The farm id for the batch")
     pond_id: str = Field(..., description="The pond id for the batch")
-    fishes: list[FishModel] = Field(default_factory=list, description="The fishes in the batch")
+    fish_ids: list[str] = Field(default_factory=list, description="The fishes in the batch")
     cycle_id: str = Field(..., description="The batch cycle id")
     duration: int = Field(..., description="The duration for the batch")
     kind: str = Field(default="Batch")
@@ -18,8 +17,13 @@ class BatchModel(Asset):
     @computed_field
     @property
     def pond(self) -> PondModel:
-        return self.sim.assets['Pond'][self.pond_id]
+        return self.sim.get_asset("Pond", self.pond_id)
 
+    @computed_field
+    @property
+    def fishes(self) -> list[FishModel]:
+        return self.sim.list_assets("Fish", lambda x: x.id in self.fish_ids)
+    
     def next_feeding_time(self) -> float:
         ...
 

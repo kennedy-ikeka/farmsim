@@ -1,7 +1,6 @@
 from pydantic import Field
 from simpy import Container
 from typing_extensions import Literal
-from time import sleep
 
 from src.models.fish import FISH_SIZE_DETAILS, FISH_SIZES
 from src.models.feed import FeedModel
@@ -17,7 +16,8 @@ class Farm(FarmModel):
 
     def model_post_init(self, __context):
         super().model_post_init(__context)
-        
+
+        self.business_model.stocks.sort(key=lambda s: s.id)
         self.containers['money'] = Container(self.env, init=self.business_model.capital) # in kobo
         self.processes['existence'] = self.env.process(self.exist())
 
@@ -30,7 +30,7 @@ class Farm(FarmModel):
         else:
             yield self.containers['money'].put(amount)
 
-        self.metric("transactions", {
+        self.sim.add_metric("transactions", self.id, {
             'time': self.env.now,
             'action': action,
             'amount': amount,
@@ -42,7 +42,8 @@ class Farm(FarmModel):
 
     def feed_exists(self, size):
         """Check if the size of feed is available in stock"""
-        for f in self.feeds:
+        feeds = self.sim.list_assets("Feed", lambda c: getattr(c, 'id') in self.feed_ids)
+        for f in feeds:
             if f.size == size:
                 return True
         return False
@@ -56,11 +57,12 @@ class Farm(FarmModel):
         yield self.env.process(self.transact("debit", feed_cost, "feed", self.tag, weight))
 
         feed.refill(weight)
-        in_stock = list(filter(lambda x: x.tag == feed.tag, self.feeds))
+        feeds = self.sim.list_assets("Feed", lambda c: getattr(c, 'id') in self.feed_ids)
+        in_stock = list(filter(lambda x: x.tag == feed.tag, feeds))
         if not len(in_stock):
-            self.feeds.append(feed)
+            self.feed_ids.append(feed.id)
         
-        self.metric("feed-stock", {
+        self.sim.add_metric("feed-stocks", self.id, {
             'size': feed.size,
             'name': feed.name,
             'weight': weight,
@@ -69,8 +71,9 @@ class Farm(FarmModel):
 
     def get_available_pond(self, volume):
         ponds: list[PondModel] = []
-        for p in self.ponds:
-            if p.volume >= volume and len(p.fishes) == 0:
+        farm_ponds = self.sim.list_assets("Pond", lambda c: getattr(c, 'id') in self.pond_ids)
+        for p in farm_ponds:
+            if p.volume >= volume and len(p.fish_ids) == 0:
                 ponds.append(p)
 
         if len(ponds):
@@ -85,7 +88,7 @@ class Farm(FarmModel):
         max_biomass_per_m3: int = get_param(self.business_model.max_biomass_per_m3, target_weight) 
         required_volume = reqiured_biomass / max_biomass_per_m3
         dimension = required_volume ** (1/3)
-        id = len(self.ponds)
+        id = len(self.pond_ids)
         return Pond(sim=self.sim, id=str(id), type="Earthen_Pond", length=dimension, width=dimension, depth=dimension, duration=duration)
 
     def acquire_pond(self, pond: PondModel, renew=False):
@@ -94,7 +97,7 @@ class Farm(FarmModel):
 
         pond.acquired_at = self.env.now
         if not renew:
-            self.ponds.append(pond)
+            self.pond_ids.append(pond.id)
 
     def pond_subscription(self, issolated=False):
         while self.active or issolated:
@@ -130,9 +133,10 @@ class Farm(FarmModel):
 
     def run_next_cycle(self, issolated=False):
         """Initiate the next cycle"""        
-        # Get the stock for the cycle
+        # Get the stock for the cycle        
         while self.active or issolated:
-            active_cycles = [c for c in self.cycles if c.active]
+            cycles = self.sim.list_assets("Cycle", lambda c: getattr(c, 'id') in self.cycle_ids)
+            active_cycles = [c for c in cycles if c.active]
             stock = self.business_model.stocks[0]
             active_stock_cycles = [c for c in active_cycles if c.stock.id == stock.id]
 
@@ -143,11 +147,10 @@ class Farm(FarmModel):
                 yield self.env.timeout(wait)
                 continue
 
-            id = len(self.cycles)
-
             # initiate the cycle
+            id = len(self.cycle_ids) + 1
             cycle = Cycle(sim=self.sim,farm_id=self.id, stock=stock, id=str(id), verbose=3)
-            self.cycles.append(cycle)
+            self.cycle_ids.append(cycle.id)
 
             # move the stock to the buttom of the stock queue
             self.business_model.stocks = self.business_model.stocks[1:] + self.business_model.stocks[:1]

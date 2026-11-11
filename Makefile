@@ -3,3 +3,11 @@ watch:
 
 test:
 	pytest -s
+
+sync:
+	python sync.py
+
+run:
+	streamlit run main.py
+
+PHONY:
