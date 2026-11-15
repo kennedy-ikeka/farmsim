@@ -1,6 +1,6 @@
 from simpy import Container
 
-from src.models.feed import FeedBatch, FeedModel
+from src.models.feed import FeedModel
 from src.utils.conversion import to_kobo
 
 class Feed(FeedModel):
@@ -24,17 +24,16 @@ class Feed(FeedModel):
 
     def get_quantity(self):
         """Get the quantity of all feed batches"""
-        return sum(b.stock.level for b in self.batches)   
+        return sum(b.level for b in self.containers.values())   
 
     def consume(self, weight: float): 
         """Take out a specified weight from the feed stock"""
 
         counter = 0 # Initialize counter
-        for b in self.batches: # Take starting from the earliest batch
-            stock: Container = b.stock
-            take = weight if stock.level >= weight else stock.level
+        for t, b in self.containers.items(): # Take starting from the earliest batch
+            take = weight if b.level >= weight else b.level
             if take > 0:
-                yield stock.get(take) # Update batch
+                yield b.get(take) # Update batch
                 counter += take  # Update the counter and weight
                 weight -= int(counter)      
                    
@@ -42,16 +41,13 @@ class Feed(FeedModel):
                 break
 
         # Remove the empty batches                
-        self.batches = [b for b in self.batches if b.stock.level > 0]
+        self.containers = {k: b for k, b in self.containers.items() if b.level > 0}
         self.info(f"Took {counter} from stock")
 
     def refill(self, weight: float):
         """Add a new batch to the feed"""
-        # Initialize batch
-        batch = FeedBatch(self.env.now, Container(self.env, init=weight))
-
-        # Add batch to feed
-        self.batches.append(batch)
+        i = len(self.containers)
+        self.containers[f'{self.env.now}_{i}'] = Container(self.env, init=weight)
 
     def expire(self):
         """Expire feed batches"""       
@@ -62,14 +58,18 @@ class Feed(FeedModel):
 
             # Get the feed that are still okay
             now = self.env.now
-            remaining = list(filter(lambda b: (now - b.time) <= 90, self.batches))
-
+            remaining = {
+                k: b 
+                for k, b in self.containers.items() 
+                if (now - float(k.split('_')[0])) <= 90
+            }
+            
             # count expired feed and log it
-            expired_count = len(self.batches) - len(remaining)
+            expired_count = len(self.containers.keys()) - len(remaining.keys())
             self.info(f"Expired {expired_count} batches.")
 
             # remove the expired feed
-            self.batches = remaining
+            self.containers = remaining
 
     def exist(self):
         yield self.env.timeout(0)

@@ -83,7 +83,7 @@ class TestCycle:
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock)
         cycle.run(until)
 
-        assert len(cycle.batches) == n_batches
+        assert len(cycle.batch_ids) == n_batches
         assert len(farm.pond_ids) == n_ponds
 
     @pytest.mark.parametrize("params", [
@@ -101,12 +101,12 @@ class TestCycle:
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock)
 
-        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": 40}).id for i in range(stock.count)]
+        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond_id, type=stock.type, options={"weight": 40}).id for i in range(stock.count)]
         batches = cycle.split_phase(phase)
         assert len(batches) == len(phase.fractions)
 
         total_batch_length = sum([len(b) for b in batches])
-        assert total_batch_length == len(cycle.fishes)
+        assert total_batch_length == len(cycle.fish_ids)
 
     @pytest.mark.parametrize("params", [
         {"duration": 10, "fractions": [1], "count": 10, "called_acquire_pond": 1},
@@ -130,7 +130,7 @@ class TestCycle:
         phase = Phase(duration, fractions, 1, "Medium_Fingerlin")
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock, active=False)
-        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": 40}).id for i in range(stock.count)]
+        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond_id, type=stock.type, options={"weight": 40}).id for i in range(stock.count)]
 
         sim.env.process(cycle.run_next_phase(True))
         sim.env.run(duration)
@@ -166,7 +166,7 @@ class TestCycle:
 
         assert called["called_transaction_amount"] <= called_transaction_amount
         assert called["called_transaction_quantity"] == count
-        assert len(cycle.fishes) == count
+        assert len(cycle.fish_ids) == count
 
     @pytest.mark.parametrize("params", [
         {"fish_size": 40, "harvest_rate": 0, "count": 10, "called_transaction_amount": 0, "called_transaction_quantity": 0},
@@ -195,10 +195,10 @@ class TestCycle:
         stock = Stock(id=1, type="Catfish", phases=[phase], size="Small_Fingerlin", count=count)
         cycle = Cycle(sim=sim, farm_id=farm.id, stock=stock,  active=False)
 
-        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond.id, type=stock.type, options={"weight": fish_size}).id for i in range(stock.count)]
+        cycle.fish_ids = [Fish(sim=sim, pond_id=farm.stocking_pond_id, type=stock.type, options={"weight": fish_size}).id for i in range(stock.count)]
         sim.env.process(cycle.harvest_fishes(harvest_rate))
         sim.env.run(1)
 
         assert called["called_transaction_amount"] == called_transaction_amount
         assert called["called_transaction_quantity"] == called_transaction_quantity
-        assert len(cycle.fishes) == count - called_transaction_quantity
+        assert len(cycle.fish_ids) == count - called_transaction_quantity

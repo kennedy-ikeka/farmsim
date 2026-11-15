@@ -10,7 +10,7 @@ class Pond(PondModel):
         super().model_post_init(__context)
 
         self.containers["health"] = Container(env=self.env, capacity=100, init=self.options.get("health", 100))
-        self.containers["water"] = Container(env=self.env, capacity=self.volume, init=self.volume)
+        self.containers["water"] = Container(env=self.env, capacity=self.volume, init=self.options.get("water", self.volume))
         self.containers["feed"] = Container(env=self.env, init=0)
         self.processes["existence"] = self.env.process(self.exist())
 

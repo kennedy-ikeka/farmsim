@@ -27,8 +27,3 @@ class Asset(Entity):
     def plug_out(self):
         ...
 
-    def get_state(self, exclude: set):
-        return self.model_dump(
-            exclude_computed_fields=True,
-            exclude={"sim", "env", "processes", "conatainers", "schedules", *exclude}
-        )

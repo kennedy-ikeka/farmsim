@@ -33,9 +33,17 @@ class Entity(Simlog):
     processes: dict[str, Process] = Field(default_factory=dict, description="The entity processes")
     containers: dict[str, Container] = Field(default_factory=dict, description="The entity containers")
     schedules: dict[str, float] = Field(default_factory=dict, description="Schedules for processes")
-    options: dict = Field(default_factory=dict, description="Optional parameters")
+    options: dict = Field(default_factory=dict, description="options parameters")
     start_time: SimTime = Field(default=0, description="The time entity was initialized")
     stop_time: SimTime = Field(default=0, description="The time entity was terminated")
+
+    @computed_field
+    @property
+    def contents(self) -> dict:
+        return {
+            k: v.level
+            for k, v in self.containers.items()
+        }
         
     def model_post_init(self, __context):
         super().model_post_init(__context)
@@ -56,4 +64,12 @@ class Entity(Simlog):
     def schedule(self, delay: float, fn: Callable, kwargs: dict = {}):
         yield self.env.timeout(delay)
         yield self.env.process(fn(**kwargs))
-    
+
+    def get_state(self, exclude: set = set()):
+        self.options.update(self.contents)
+        state = self.model_dump(
+            mode="json",
+            exclude_computed_fields=True,
+            exclude={"sim", "env", "processes", "containers", "schedules", *exclude}
+        )
+        return state

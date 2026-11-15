@@ -106,7 +106,7 @@ class TestSimulation():
         sim.run(duration)
         sim.save()
 
-        sim_path = join(str(TMP_DIR), 'simulations', sim.timestamp.strftime("%d_%m_%Y_%H_%M_%S"))
+        sim_path = join(str(TMP_DIR), 'simulations', sim.timestamp)
         exists = isdir(sim_path)
         assert exists == True
 

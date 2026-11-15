@@ -1,14 +1,23 @@
 import os
-from typing import Any, Callable, Mapping, Optional
+from typing import Callable, Optional
 from pydantic import Field
-from pandas import DataFrame, concat, read_csv
+from pandas import DataFrame, read_csv
 import json
 
 from models.asset import Asset
+from simulations.batch import Batch
+from simulations.cycle import Cycle
+from simulations.feed import Feed
+from simulations.fish import Fish
+from simulations.pond import Pond
 from src.models.farm import FarmBusinessModel
 from src.models.simulation import SimulationModel
 from src.simulations.farm import Farm
 
+ASSET_TYPES: dict[str, type[Asset]] = {
+    cls.__name__: cls 
+    for cls in (Farm, Cycle, Batch, Fish, Pond, Feed)
+}
 
 class Simulation(SimulationModel):
     business_models: dict[str, FarmBusinessModel] = Field(default_factory=dict, description="The business models of the farms")
@@ -21,9 +30,8 @@ class Simulation(SimulationModel):
         self.processes["existence"] = self.env.process(self.exist())
 
     def exist(self):
-        interval = self.options.get("checkpoint_interval", 1)
         while self.active:
-            yield self.env.timeout(interval)
+            yield self.env.timeout(self.checkpoint_interval)
             self.info(f"Simulation at: {self.get_age()}")
 
             if self.store:
@@ -67,6 +75,7 @@ class Simulation(SimulationModel):
         if not exists:
             raise ValueError(f"Simulation in path: {path} not found")
 
+        # Load datasets
         files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
         csvs = filter(lambda x: x.endswith('.csv'), files)
 
@@ -75,20 +84,25 @@ class Simulation(SimulationModel):
             frame = read_csv(os.path.join(path, f))
             self.datasets[file] = frame.to_dict(orient="records")
 
-        # with open(os.path.join(path, "settings.json"), "rb+") as s:
-        #     settings = json.load(s)
+        # Load settings
+        with open(f'{path}/settings.json', "rb+") as s:
+            settings = json.load(s)
 
-        #     for key, value in settings["farms"].items():
-        #         self.spawn_farm(key, FarmBusinessModel(**value))
+            # Load config
+            for k, v in settings['config'].items():
+                setattr(self, k, v)
+
+            # Load assets
+            for k, v in settings['assets'].items():
+                for i, a in v.items():
+                    ASSET_TYPES[k](**a, sim=self)
 
     def save(self):
         """Save simulation data"""
 
         # set the id of the simulation
-        id = self.timestamp.strftime("%d_%m_%Y_%H_%M_%S")
-
         # create the path
-        path = os.path.join(self.out_dir, f'simulations/{id}')
+        path = os.path.join(self.out_dir, f'simulations/{self.timestamp}')
         os.makedirs(path, exist_ok=True)
 
         # save each entities data collections as a single csv
@@ -96,8 +110,19 @@ class Simulation(SimulationModel):
             frame = DataFrame(table).sort_values(by="time")
             frame.to_csv(f"{path}/{table_name}.csv", index=False)
 
-        # farms = {name: fm.model_dump() for name, fm in self.farms.items()}
-        # data = self.model_dump()
+        assets = {
+            t: {
+                i: a.get_state()
+                for i, a in d.items()
+            }
+            for t, d in self.assets.items()
+        }
+                
+        config = self.get_state(exclude={'assets', 'datasets'})
+        settings = {
+            "config": config,
+            "assets": assets
+        }
 
-        # with open(f"{path}/settings.json", "w", encoding="utf-8") as f:
-        #     json.dump(data, f, indent=2, ensure_ascii=False)
+        with open(f'{path}/settings.json', "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2, ensure_ascii=False)

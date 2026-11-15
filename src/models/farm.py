@@ -1,9 +1,9 @@
 from pydantic import BaseModel, Field, computed_field, field_validator
 from typing_extensions import Generator, Literal
 
+from src.models.stock import Stock
 from src.models.asset import Asset
 from src.models.fish import FISH_SIZES
-from src.models.cycle import CycleModel, Stock
 from src.models.pond import PondModel
 from src.models.feed import FeedModel
 
@@ -56,7 +56,7 @@ class FarmModel(Asset):
     pond_ids: list[str] = Field(default_factory=list, description="The ponds for the farm")
     feed_ids: list[str] = Field(default_factory=list, description="The feeds for the farm")
     cycle_ids: list[str] = Field(default_factory=list, description="The cycles implemented by the farm")
-    stocking_pond: PondModel = Field(default_factory=lambda data: PondModel(sim=data["sim"], type="Portable_Pond"), description="The ponds stocking portable pond")
+    stocking_pond_id: str = Field(default="", description="The ponds stocking portable pond")
     kind: str = Field(default="Farm")
     
     def transact(self, type: TRANSACTION_TYPES, amount: int, item: str, entity_tag: str, quantity=1) -> Generator:

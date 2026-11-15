@@ -1,6 +1,7 @@
 from pydantic import Field, computed_field
 from typing_extensions import Generator
 
+from src.models.farm import FarmModel
 from src.models.asset import Asset
 from src.models.fish import FishModel
 from src.models.feed import FeedModel
@@ -14,15 +15,14 @@ class BatchModel(Asset):
     duration: int = Field(..., description="The duration for the batch")
     kind: str = Field(default="Batch")
 
-    @computed_field
-    @property
-    def pond(self) -> PondModel:
-        return self.sim.get_asset("Pond", self.pond_id)
+    def get_pond(self) -> PondModel:
+        ...
 
-    @computed_field
-    @property
     def fishes(self) -> list[FishModel]:
-        return self.sim.list_assets("Fish", lambda x: x.id in self.fish_ids)
+        ...
+
+    def get_farm(self) -> FarmModel:
+        ...
     
     def next_feeding_time(self) -> float:
         ...

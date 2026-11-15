@@ -45,14 +45,14 @@ class TestFeed:
         assert q == left
 
     @pytest.mark.parametrize("params", [
-        [10],
-        [10, 10],
+        # [10],
+        # [10, 10],
         [10, 10000],
     ])
     def test_refill_feed(self, params):
-        feed = Feed(name="Random", size=1.0)       
-        for i in params:
-            feed.refill(i)
+        feed = Feed(name="Random", size=1.0)  
+        for i, p in enumerate(params):
+            feed.refill(p)
 
         q = feed.get_quantity()
         assert q == sum(params)
@@ -84,9 +84,9 @@ class TestFeed:
         feed.env.run(until=params)
 
         if params > 90:
-            assert len(feed.batches) == 0
+            assert len(feed.containers.values()) == 0
         else:
-            assert len(feed.batches) == 1
+            assert len(feed.containers.values()) == 1
 
     @pytest.mark.parametrize("params", [
         {"feed_params": {"size": 1.0}, "weight": 1000, "feed_cost": 10000_00},

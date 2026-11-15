@@ -2,7 +2,8 @@ import numpy as np
 from faker import Faker
 from pydantic import Field, computed_field
 
-from src.models.fish import FISH_SIZE_DETAILS
+from models.pond import PondModel
+from src.models.fish import FISH_SIZE_DETAILS, FishModel
 from src.models.batch import BatchModel
 from src.models.farm import FarmModel
 from src.simulations.feed import Feed
@@ -14,16 +15,13 @@ faker = Faker()
 class Batch(BatchModel):
     farm_id: str = Field(..., description="The farm id for the batch")
 
-    @computed_field
-    @property
-    def farm(self) -> FarmModel:
-        return self.sim.get_asset("Farm", self.farm_id)
-
     def model_post_init(self, __context) -> None:
         super().model_post_init(__context)
         
         self.schedules["next_feeding"] = 1
-        self.pond.fish_ids = self.fish_ids
+
+        pond = self.get_pond()
+        pond.fish_ids = self.fish_ids
         
         for fish_id in self.fish_ids:
             f = self.sim.get_asset("Fish", fish_id)
@@ -32,13 +30,23 @@ class Batch(BatchModel):
 
         self.processes["existence"] = self.env.process(self.exist())
 
+    def get_pond(self) -> PondModel:
+        return self.sim.get_asset("Pond", self.pond_id)
+
+    def get_fishes(self) -> list[FishModel]:
+        return self.sim.list_assets("Fish", lambda x: x.id in self.fish_ids)
+
+    def get_farm(self) -> FarmModel:
+        return self.sim.get_asset("Farm", self.farm_id)
+
     def get_batch_weight(self):
-        return np.median([f.containers['weight'].level for f in self.pond.get_fishes()]) if self.pond.fish_ids else 0
+        pond = self.get_pond()
+        return np.median([f.containers['weight'].level for f in pond.get_fishes()]) if pond.fish_ids else 0
 
     def get_next_feeding_time(self):
         """Get the next time to feed the fishes based on feeding hours"""
-        
-        feeding_hours: list = get_param(self.farm.business_model.feeding_hours, self.get_batch_weight())            
+        farm = self.get_farm()
+        feeding_hours: list = get_param(farm.business_model.feeding_hours, self.get_batch_weight())            
 
         # Get the current hour of the day
         now = self.env.now
@@ -67,19 +75,23 @@ class Batch(BatchModel):
     def get_feed(self):
         """Get the appropriate feed in stock based on the median weight of the fishes"""
         size = self.get_feed_size()
-        feeds = self.sim.list_assets("Feed", lambda c: getattr(c, 'id') in self.farm.feed_ids)
+        farm = self.get_farm()
+        feeds = self.sim.list_assets("Feed", lambda c: getattr(c, 'id') in farm.feed_ids)
         for f in feeds:
             if f.size == size:
                 return f
 
     def feed_fishes(self):
         """Feed the fishes in the pond"""
+        farm = self.get_farm()
+        pond = self.get_pond()
+
         while self.active:
             self.info(f"Next feeding in {self.schedules["next_feeding"] * 24} hours")
             yield self.env.timeout(self.schedules["next_feeding"])
 
             # Get the feed to be consumed by each fish
-            total_feed = sum([f.get_hunger_weight() for f in self.pond.get_fishes()])
+            total_feed = sum([f.get_hunger_weight() for f in pond.get_fishes()])
             if total_feed == 0:
                 continue
 
@@ -91,9 +103,9 @@ class Batch(BatchModel):
                 feed_size = self.get_feed_size()
 
                 weight = self.get_batch_weight()
-                rate: float = get_param(self.farm.business_model.feed_conversion_rate, weight)
-                floats: bool = get_param(self.farm.business_model.feed_floating, weight)  
-                id = len(self.farm.feed_ids)
+                rate: float = get_param(farm.business_model.feed_conversion_rate, weight)
+                floats: bool = get_param(farm.business_model.feed_floating, weight)  
+                id = len(farm.feed_ids)
                 feed = Feed(
                     sim=self.sim, 
                     name=faker.name(), 
@@ -110,7 +122,7 @@ class Batch(BatchModel):
 
             if remaining_feed < total_feed:
                 self.info(f'Feed not enough to for fishes')
-                yield self.sim.env.process(self.farm.stock_feed(feed=feed, weight=purchase_feed))
+                yield self.sim.env.process(farm.stock_feed(feed=feed, weight=purchase_feed))
 
 
             # Update the feed stock
@@ -119,7 +131,7 @@ class Batch(BatchModel):
 
             # Feed fishes and update their hunger
             self.info(f'Pour feed into pond')
-            yield self.pond.containers['feed'].put(total_feed)
+            yield pond.containers['feed'].put(total_feed)
 
             # Update the next feed time
             self.schedules["next_feeding"] = self.get_next_feeding_time()
@@ -137,13 +149,16 @@ class Batch(BatchModel):
 
     def maintain_pond(self):
         """Keep the pond healthy and secure for the fishes"""
+        farm = self.get_farm()
+        pond = self.get_pond()
+
         while self.active:
-            contamination_rate = 1 - (self.pond.containers['health'].level/self.pond.containers['health'].capacity)
-            pond_contamination_limit: float = get_param(self.farm.business_model.pond_contamination_limit, self.get_batch_weight()) 
+            contamination_rate = 1 - (pond.containers['health'].level/pond.containers['health'].capacity)
+            pond_contamination_limit: float = get_param(farm.business_model.pond_contamination_limit, self.get_batch_weight()) 
             dirty = contamination_rate >= pond_contamination_limit
             if dirty:
                 self.info(f'Pond health is low, decontaminating')
-                yield self.env.process(self.pond.decontaminate())
+                yield self.env.process(pond.decontaminate())
             yield self.env.timeout(1)
 
     def expire(self):
@@ -164,7 +179,8 @@ class Batch(BatchModel):
         yield self.env.timeout(0)
                 
     def terminate(self):
-        self.pond.fish_ids = []
+        pond = self.get_pond()
+        pond.fish_ids = []
         self.active = False
         yield self.env.timeout(0)
 

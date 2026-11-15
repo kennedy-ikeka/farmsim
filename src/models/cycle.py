@@ -4,34 +4,11 @@ from typing import Optional
 from typing_extensions import Generator
 from pydantic import Field, computed_field, field_validator
 
+from src.models.farm import FarmModel
+from src.models.stock import Phase, Stock
 from src.models.asset import Asset
-from src.models.fish import FISH_SIZES, FISH_TYPES
+from src.models.fish import FISH_SIZES, FISH_TYPES, FishModel
 from src.models.batch import BatchModel
-
-@dataclass
-class Phase():
-    duration: int
-    fractions: list[float]
-    harvest: float = Field(description="The fraction to harvest after phase", le=1, ge=0)
-    target_size: FISH_SIZES = Field(description="The target size for this phase")
-
-    @field_validator("fractions", check_fields=False)
-    def validate_phases(cls, v: list[float]):
-        if abs(sum(v) - 1.0) > 1e-9:
-            raise ValueError("All stock phases must sum up to 1")
-
-@dataclass
-class Stock():
-    id: int
-    type: FISH_TYPES
-    count: int
-    size: FISH_SIZES
-    phases: list[Phase]
-    gap: Optional[int] = None
-
-    @property
-    def duration(self) -> int:
-        return sum([p.duration for p in self.phases])
 
 
 class CycleModel(Asset):   
@@ -40,13 +17,14 @@ class CycleModel(Asset):
     batch_ids: list[list[str]] = Field(default_factory=list, description="The cycle batches")
     kind: str = Field(default="Cycle")
 
-    @computed_field
-    @property
-    def batches(self) -> list[list[BatchModel]]:
-        return [
-            self.sim.list_assets("Batch", lambda x: x.id in phase_batches)
-            for phase_batches in self.batch_ids
-        ]
+    def get_farm(self) -> FarmModel:
+        ...
+
+    def get_fishes(self) -> list[FishModel]:
+        ...
+
+    def get_batches(self) -> list[list[BatchModel]]:
+        ...
 
     def split_phase(self, phase: Phase):
         ...

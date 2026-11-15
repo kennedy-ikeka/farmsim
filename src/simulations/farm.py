@@ -12,12 +12,12 @@ from src.utils.conversion import to_kilo
 from src.utils.helper import get_param
 
 class Farm(FarmModel):
-    stocking_pond: Pond = Field(default_factory=lambda data: Pond(sim=data["sim"], type="Portable_Pond"), description="The ponds stocking portable pond")
-
     def model_post_init(self, __context):
         super().model_post_init(__context)
 
         self.business_model.stocks.sort(key=lambda s: s.id)
+        self.stocking_pond_id: str = Pond(sim=self.sim, type="Portable_Pond").id
+
         self.containers['money'] = Container(self.env, init=self.business_model.capital) # in kobo
         self.processes['existence'] = self.env.process(self.exist())
 

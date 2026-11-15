@@ -240,7 +240,7 @@ class TestBatch:
         batch = Batch(sim=sim, farm_id=farm.id, pond_id=pond.id, fish_ids=[fish.id], **batch_params)
         sim.env.run(until)
 
-        median_fish_size = np.median([f.containers['weight'].level for f in batch.fishes])
+        median_fish_size = np.median([f.containers['weight'].level for f in batch.get_fishes()])
         assert median_fish_size > fish_size
         assert batch.get_age() == until
         assert batch.active == active
