@@ -55,7 +55,7 @@ class TestPond():
         pond.run(until)
 
         assert round(pond.containers['health'].level, 2) == health_level
-        assert round(pond.containers['feed'].level, 2) == feed_level
+        assert round(pond.containers['NATURAL_FEED'].level, 2) == feed_level
 
     @pytest.mark.parametrize("params", [
         {
@@ -75,7 +75,8 @@ class TestPond():
         pond_params = params['pond_params']
         pond_cost = params['pond_cost']
 
-        pond = Pond(**pond_params)
+        sim = Simulation()
+        pond = Pond(**pond_params, sim=sim)
         cost = pond.get_cost()
         assert cost == pond_cost
 
@@ -103,7 +104,7 @@ class TestPond():
 
         pond = Pond(**pond_params)
         pond.run(until)
-        assert round(pond.containers['feed'].level, 5) == feed_level
+        assert round(pond.containers['NATURAL_FEED'].level, 5) == feed_level
 
     @pytest.mark.parametrize("params", [
         {

@@ -89,7 +89,7 @@ class TestSimulation():
     @pytest.mark.parametrize("params", [
         {"duration": 10},
     ])
-    def test_save(self, params):
+    def test_save_simulation(self, params):
         duration = params["duration"]
 
         phases = [
@@ -110,3 +110,25 @@ class TestSimulation():
         exists = isdir(sim_path)
         assert exists == True
 
+        s = Simulation()
+        assert s.id != sim.id
+
+        s.load(sim_path)
+        assert s.id == sim.id
+
+    @pytest.mark.parametrize("params", [
+        {"rate": 0.2, "price": 100, "duration": 10, "inflated_price": 100},
+        {"rate": 0.2, "price": 100, "duration": 100, "inflated_price": 105},
+        {"rate": 0.2, "price": 100, "duration": 366, "inflated_price": 120}
+    ])
+    def test_inflated_price(self, params):
+        rate = params['rate']
+        price = params['price']
+        duration = params['duration']
+        inflated_price = params['inflated_price']
+
+        sim = Simulation(inflation_rate=rate)
+        sim.run(duration)
+
+        p = sim.inflated_price(price)
+        assert p == inflated_price

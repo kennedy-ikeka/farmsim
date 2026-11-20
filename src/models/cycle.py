@@ -15,7 +15,6 @@ class CycleModel(Asset):
     farm_id: str = Field(..., description="The farm id for the cycle")
     stock: Stock = Field(..., description="The cycles stocking")
     batch_ids: list[list[str]] = Field(default_factory=list, description="The cycle batches")
-    kind: str = Field(default="Cycle")
 
     def get_farm(self) -> FarmModel:
         ...

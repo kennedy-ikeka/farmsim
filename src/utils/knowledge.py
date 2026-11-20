@@ -168,7 +168,7 @@ class Knowledge:
             self.update_document(chunks, file['id'], metadata)
             logger.info(f"Ingested file {file['name']} with id {file['id']} into vector store")
 
-    async def sync_datasets(self, sheet_id: str, datasets: Optional[list[str]] = None) -> list[str]:
+    async def sync_datasets(self, sheet_id: str, datasets: Optional[list[str]] = None, injest=False) -> list[str]:
         """Sync local dataset CSV files from the datasets folder into the knowledge base.
 
         Reads every CSV file in the configured datasets directory, converts them into
@@ -182,10 +182,11 @@ class Knowledge:
         Returns:
             List of synced file paths.
         """
-        makedirs(DATA_DIR, exist_ok=True)
+        folder_path = path.join(DATA_DIR, 'observations')
+        makedirs(folder_path, exist_ok=True)
         synced: list[str] = []
 
-        datasets = datasets if datasets else await drive.download_sheet(sheet_id)
+        datasets = datasets if datasets else await drive.download_sheet(sheet_id, path=folder_path)
         for filepath in datasets:
             if not path.isfile(filepath):
                 logger.warning(f"Dataset file not found: {filepath}")
@@ -197,10 +198,11 @@ class Knowledge:
                 logger.error(f"Failed to read dataset {filepath}: {exc}")
                 continue
 
-            file_id = path.basename(filepath)
-            self.ingest_from_dataframe(df, file_id)
-            synced.append(filepath)
-            logger.info(f"Synced dataset {file_id} into vector store")
+            if injest:
+                file_id = path.basename(filepath)
+                self.ingest_from_dataframe(df, file_id)
+                synced.append(filepath)
+                logger.info(f"Synced dataset {file_id} into vector store")
 
         return synced
 

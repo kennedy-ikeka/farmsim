@@ -13,7 +13,6 @@ class BatchModel(Asset):
     fish_ids: list[str] = Field(default_factory=list, description="The fishes in the batch")
     cycle_id: str = Field(..., description="The batch cycle id")
     duration: int = Field(..., description="The duration for the batch")
-    kind: str = Field(default="Batch")
 
     def get_pond(self) -> PondModel:
         ...

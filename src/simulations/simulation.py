@@ -13,6 +13,7 @@ from simulations.pond import Pond
 from src.models.farm import FarmBusinessModel
 from src.models.simulation import SimulationModel
 from src.simulations.farm import Farm
+from utils.conversion import DAYS_IN_MONTHS, HOURS_IN_DAY, MONTHS_IN_YEAR
 
 ASSET_TYPES: dict[str, type[Asset]] = {
     cls.__name__: cls 
@@ -33,9 +34,6 @@ class Simulation(SimulationModel):
         while self.active:
             yield self.env.timeout(self.checkpoint_interval)
             self.info(f"Simulation at: {self.get_age()}")
-
-            if self.store:
-                self.save()
 
     def get_asset[T: Asset](self, asset_type: str, id: str) -> T:
         asset_collection = self.assets.get(asset_type, {})
@@ -126,3 +124,8 @@ class Simulation(SimulationModel):
 
         with open(f'{path}/settings.json', "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
+
+    def inflated_price(self, price: float):
+        months = self.get_age() // DAYS_IN_MONTHS
+        years = months / MONTHS_IN_YEAR
+        return (1 + self.inflation_rate * years) * price

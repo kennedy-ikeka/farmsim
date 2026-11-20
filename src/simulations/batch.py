@@ -1,6 +1,7 @@
 import numpy as np
+import pandas as pd
 from faker import Faker
-from pydantic import Field, computed_field
+from pydantic import Field
 
 from models.pond import PondModel
 from src.models.fish import FISH_SIZE_DETAILS, FishModel
@@ -19,7 +20,6 @@ class Batch(BatchModel):
         super().model_post_init(__context)
         
         self.schedules["next_feeding"] = 1
-
         pond = self.get_pond()
         pond.fish_ids = self.fish_ids
         
@@ -131,7 +131,7 @@ class Batch(BatchModel):
 
             # Feed fishes and update their hunger
             self.info(f'Pour feed into pond')
-            yield pond.containers['feed'].put(total_feed)
+            yield pond.containers['SUPPLIMENT_FEED'].put(total_feed)
 
             # Update the next feed time
             self.schedules["next_feeding"] = self.get_next_feeding_time()
@@ -147,31 +147,76 @@ class Batch(BatchModel):
                 'cycle_id': self.cycle_id
             })
 
-    def maintain_pond(self):
+    def maintain_pond(self, issolated=False):
         """Keep the pond healthy and secure for the fishes"""
         farm = self.get_farm()
         pond = self.get_pond()
 
-        while self.active:
+        while self.active or issolated:
             contamination_rate = 1 - (pond.containers['health'].level/pond.containers['health'].capacity)
             pond_contamination_limit: float = get_param(farm.business_model.pond_contamination_limit, self.get_batch_weight()) 
             dirty = contamination_rate >= pond_contamination_limit
             if dirty:
                 self.info(f'Pond health is low, decontaminating')
                 yield self.env.process(pond.decontaminate())
+
+            yield self.env.process(self.remove_mortalities())
             yield self.env.timeout(1)
 
-    def expire(self):
-        while self.active:
+    def remove_mortalities(self):
+        yield self.env.timeout(0)
+        dead_fishes: list[FishModel] = self.sim.list_assets('Fish', lambda x: (getattr(x, 'id') in self.fish_ids) and (getattr(x, 'active') == False))
+        dead_counts = {}
+        for f in dead_fishes:
+            dead_counts[f.mortality] = dead_counts.get(f.mortality, 0) + 1
+
+        for k, v in dead_counts.items():
+            # Log sampling data
+            self.sim.add_metric("fish-mortality", self.farm_id, {
+                'category': k,
+                'count': v,
+                'batch_id': self.id,
+            })
+
+        dead_ids = [f.id for f in dead_fishes]
+        self.fish_ids = [id for id in self.fish_ids if id not in dead_ids]
+
+    def expire(self, issolated=False):
+        while self.active or issolated:
             yield self.env.timeout(1)
             age = self.get_age()
             if age >= self.duration:
                 yield self.env.process(self.terminate())
 
+    def sample_fishes(self, issolated=False):
+        farm = self.get_farm()
+
+        while self.active or issolated:
+            # collect random sample
+            sampling_size: int = get_param(farm.business_model.sampling_size, self.get_batch_weight())
+            sample_ids = self.rng.choice(self.fish_ids, sampling_size)
+            sample = self.sim.list_assets('Fish', lambda f: getattr(f, 'id') in sample_ids)
+
+            # get the mean and std of the sample weights
+            weights = pd.Series([s.containers['weight'].level for s in sample])
+            summary = weights.describe()
+
+            # Log sampling data
+            self.sim.add_metric("fish-sampling", self.farm_id, {
+                **summary,
+                'batch_id': self.id,
+                'total': weights.sum()
+            })
+
+            # Wait till next sampling time
+            sampling_interval: float = get_param(farm.business_model.sampling_interval, self.get_batch_weight()) 
+            yield self.env.timeout(sampling_interval)
+        
     def exist(self):
         if self.active:
             self.env.process(self.schedule(self.duration, self.terminate))
-            
+
+            self.processes['fish_sampling'] = self.env.process(self.sample_fishes())
             self.processes['fish_feeding'] = self.env.process(self.feed_fishes())
             self.processes['pond_maintainance'] = self.env.process(self.maintain_pond())
             self.processes['expiry'] = self.env.process(self.expire())

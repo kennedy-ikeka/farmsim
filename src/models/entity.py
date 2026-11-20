@@ -10,9 +10,9 @@ class Simlog(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
     env: Environment = Field(default_factory=Environment, description="The simulation environment")
-    kind: str = Field(..., description="The kind of entity")
     id: str = Field(default_factory=lambda: uuid4().hex, description="The id of the entity")
     verbose: int = Field(default=0, description="The log level", ge=0, le=3)
+    kind: str = Field(default="")
 
     @computed_field
     @property
@@ -47,6 +47,7 @@ class Entity(Simlog):
         
     def model_post_init(self, __context):
         super().model_post_init(__context)
+        self.kind = type(self).__name__ if self.kind == "" else self.kind
 
     def run(self, until):
         """Run the entity"""

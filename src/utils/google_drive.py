@@ -131,7 +131,7 @@ class GoogleDrive:
                     logger.error(f"Failed to download {file_id}: {e}")
         return results
 
-    async def download_sheet(self, sheet_id: str) -> list[str]:
+    async def download_sheet(self, sheet_id: str, path: str) -> list[str]:
         """Download every Google Sheet in a folder as a CSV file.
 
         Uses the existing ``download`` method to fetch the spreadsheet as an
@@ -155,8 +155,8 @@ class GoogleDrive:
             values = s.spreadsheets().values().get(spreadsheetId=sheet_id, range=table).execute()
 
             df = pd.DataFrame(values.get('values', []))
-            path = f"{DATA_DIR}/{table}.csv"
-            df.to_csv(path, index=False)
-            path_list.append(path)
+            file_path = f"{path}/{table}.csv"
+            df.to_csv(file_path, index=False)
+            path_list.append(file_path)
 
         return path_list

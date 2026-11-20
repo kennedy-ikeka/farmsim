@@ -11,7 +11,8 @@ class Pond(PondModel):
 
         self.containers["health"] = Container(env=self.env, capacity=100, init=self.options.get("health", 100))
         self.containers["water"] = Container(env=self.env, capacity=self.volume, init=self.options.get("water", self.volume))
-        self.containers["feed"] = Container(env=self.env, init=0)
+        self.containers["SUPPLIMENT_FEED"] = Container(env=self.env, init=0)
+        self.containers["NATURAL_FEED"] = Container(env=self.env, init=0)
         self.processes["existence"] = self.env.process(self.exist())
 
     def get_cost(self, duration: Optional[int] = None) -> int:
@@ -21,7 +22,7 @@ class Pond(PondModel):
         
         duration = duration if duration is not None else self.duration
         rent_rate = 1 if duration == 0 else duration * 0.1
-        price = self.volume * self.details.cost * adjustment * rent_rate
+        price = self.volume * self.sim.inflated_price(self.details.cost) * adjustment * rent_rate
         return int(price)
 
     def decontaminate(self):
@@ -35,8 +36,11 @@ class Pond(PondModel):
             yield self.containers['water'].get(self.containers['water'].level)
             self.info("Drained pond water")
 
-        if self.containers['feed'].level > 0:
-            yield self.containers['feed'].get(self.containers['feed'].level)
+        if self.containers['SUPPLIMENT_FEED'].level > 0:
+            yield self.containers['SUPPLIMENT_FEED'].get(self.containers['SUPPLIMENT_FEED'].level)
+
+        if self.containers['NATURAL_FEED'].level > 0:
+            yield self.containers['NATURAL_FEED'].get(self.containers['NATURAL_FEED'].level)
 
         # Fill the pond with clean water
         t_fill = self.drain_speed * self.volume
@@ -48,9 +52,9 @@ class Pond(PondModel):
         yield self.containers['health'].put(self.containers['health'].capacity - self.containers['health'].level)
         self.info(f"Decontaminated pond, Health at {self.containers['health'].level}")
 
-    def contaminate(self):
+    def contaminate(self, issolated=False):
         """Contaminate the water in the pond"""
-        while self.active:
+        while self.active or issolated:
             yield self.env.timeout(1)
 
             # Get the contermination rate based on the volumn of the pond
@@ -65,9 +69,9 @@ class Pond(PondModel):
             yield self.containers['health'].get(health_lost)
             self.info(f'Contaminated pond: Health at {self.containers['health'].level}')
 
-    def spawn_feed(self):
+    def spawn_feed(self, issolated=False):
         """Spawn feed in the pond"""
-        while self.active:
+        while self.active or issolated:
             yield self.env.timeout(1)
 
             # Make sure there is water in the pond
@@ -77,7 +81,7 @@ class Pond(PondModel):
             # Get the weight of feed to spawn based on the water level
             feed_weight = self.details.feed_spawn_rate * self.containers['water'].level
 
-            yield self.containers['feed'].put(feed_weight)
+            yield self.containers['NATURAL_FEED'].put(feed_weight)
             self.info(f"Spawned feed weighing {feed_weight:.2f} units")
 
     def seepage(self):

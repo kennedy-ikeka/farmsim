@@ -10,11 +10,10 @@ class SimulationModel(Entity):
     assets: dict[str, dict] = Field(default_factory=dict, description="The simulation assets")
     timestamp: str = Field(default=datetime.now().strftime("%Y_%m_%d_%H_%M_%S"), description="The time the simulation started")
     seed: int = Field(default=0, description="The simulation seed")
-    store: bool = Field(default=False, description="Save the simulation")
-    kind: str = Field(default="Simulation")
     datasets: dict[str, list[dict]] = Field(default_factory=dict, description="The tables for the entity")
     out_dir: str = Field(default=DATA_DIR, description="The directory to store dataset")
     checkpoint_interval: int = Field(default=1, description="Optional parameters")
+    inflation_rate: float = Field(default=0.2, description="The rate of inflation in the simulation", gt=0, lt=1)
 
     def load(self, path: str):
         ...
@@ -35,4 +34,7 @@ class SimulationModel(Entity):
         ...
 
     def list_assets[T](self, asset_type: str, where: Optional[Callable[[T], bool]]) -> list[T]:
+        ...
+
+    def inflated_price(self, price: float) -> float:
         ...

@@ -103,33 +103,35 @@ class Farm(FarmModel):
         while self.active or issolated:
             yield self.env.timeout(1)
 
-            # for p in self.ponds:
-            #     # Is pond subscribable
-            #     if p.duration == 0:
-            #         continue
+            ponds: list[Pond] = self.sim.list_assets(Pond.__name__, lambda x: x in self.pond_ids)
+            for p in ponds:
+                # Is pond subscribable
+                if p.duration == 0:
+                    continue
 
-            #     if p.acquired_at is None:
-            #         continue
+                if p.acquired_at is None:
+                    continue
 
-            #     # Is subscription due
-            #     used_rent = int(self.env.now - p.acquired_at)
-            #     if used_rent <= p.duration:
-            #         continue
-                
-            #     # get the pond batch
-            #     batches = [
-            #         batch for c in self.cycles 
-            #         for phase_batches in c.batches 
-            #         for batch in phase_batches
-            #         if batch.active and batch.pond.tag == p.tag
-            #     ]
+                # Is subscription due
+                used_rent = int(self.env.now - p.acquired_at)
+                if used_rent <= p.duration:
+                    continue
 
-            #     if len(batches) == 0:
-            #         self.ponds = list(filter(lambda x: x.tag != p.tag, self.ponds))
-            #         continue
+                # get the pond batch
+                cycles: list[Cycle] = self.sim.list_assets(Cycle.__name__, lambda x: x in self.cycle_ids)
+                batches = [
+                    batch for c in cycles 
+                    for phase_batches in c.get_batches() 
+                    for batch in phase_batches
+                    if batch.active and batch.pond_id == p.id
+                ]
+
+                if len(batches) == 0:
+                    self.ponds = list(filter(lambda x: x.id != p.id, ponds))
+                    continue
                                 
-            #     # retain pond for extra duration
-            #     yield self.env.process(self.acquire_pond(p, renew=True))       
+                # retain pond for extra duration
+                yield self.env.process(self.acquire_pond(p, renew=True))       
 
     def run_next_cycle(self, issolated=False):
         """Initiate the next cycle"""        

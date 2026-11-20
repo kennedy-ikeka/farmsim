@@ -94,7 +94,7 @@ class Cycle(CycleModel):
         fish_details = FISH_SIZE_DETAILS[self.stock.size]
         fish_size = self.rng.integers(fish_details.min_size, fish_details.max_size)
         total_weight = fish_size * num_fishes
-        total_price = to_naira(num_fishes * fish_details.default_price)
+        total_price = to_naira(num_fishes * self.sim.inflated_price(fish_details.default_price))
         total_price_kobo = to_kobo(total_price)
 
         farm = self.get_farm()
@@ -106,13 +106,12 @@ class Cycle(CycleModel):
             Fish(
                 sim=self.sim,
                 pond_id=farm.stocking_pond_id, 
-                id=str(id), 
                 type='Catfish', 
                 cycle_id=self.id, 
                 farm_id=farm.id,
                 options={"weight": self.rng.exponential(fish_size)}
             ).id
-            for id in range(num_fishes)
+            for _ in range(num_fishes)
         ]
 
         self.sim.add_metric("fish-stocks", self.farm_id, {
@@ -135,7 +134,7 @@ class Cycle(CycleModel):
             return
 
         total_weight = sum(f.containers['weight'].level for f in to_harvest)
-        total_price = to_naira(COST_PER_KILO * to_kilo(total_weight))
+        total_price = to_naira(self.sim.inflated_price(COST_PER_KILO) * to_kilo(total_weight))
         total_price_kobo = to_kobo(total_price)
 
         farm = self.get_farm()

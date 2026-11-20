@@ -7,7 +7,9 @@ from typing_extensions import Generator, Literal
 
 from src.models.asset import Asset
 from src.models.fish import FishModel
-from src.utils.conversion import DAY_IN_HOURS, HOUR_IN_MINUTES
+from src.utils.conversion import HOURS_IN_DAY, MINUTES_IN_HOUR
+
+POND_FEED_TYPES = Literal['NATURAL_FEED', 'SUPPLIMENT_FEED', 'CANNIBALISM']
 
 POND_TYPES = Literal[
     "Earthen_Pond", 
@@ -40,7 +42,6 @@ class PondModel(Asset):
     duration: int = Field(default=0, description="The duration of the pond")
     type: POND_TYPES = Field(..., description="The type of pond")    
     acquired_at: Optional[SimTime] = Field(default=None, description="Time when pond was aqcuired")
-    kind: str = Field(default="Pond")
        
     @computed_field
     @property
@@ -60,7 +61,7 @@ class PondModel(Asset):
     @computed_field
     @property
     def drain_speed(self) -> float:
-        return self.rng.integers(30, 40) / HOUR_IN_MINUTES / DAY_IN_HOURS  # drain speed in days
+        return self.rng.integers(30, 40) / MINUTES_IN_HOUR / HOURS_IN_DAY  # drain speed in days
 
     def get_fishes(self) -> list[FishModel]:
         ...

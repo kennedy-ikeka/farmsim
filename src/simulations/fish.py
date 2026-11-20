@@ -1,9 +1,12 @@
+from typing import Literal
+
 from pydantic import Field, computed_field
 from simpy import Container
 import numpy as np
 
+from models.animal import MORTALITY_TYPES
 from src.models.fish import FishModel, FISH_SIZE_DETAILS
-from src.models.pond import PondModel
+from src.models.pond import POND_FEED_TYPES, PondModel
 from src.utils.conversion import to_kilo
 
 feeding_logs = []
@@ -65,7 +68,7 @@ class Fish(FishModel):
         waste_rate = 1 - self.get_hunger_rate() 
         return waste_rate * self._stomach_weight
 
-    def eat(self, feed_weight, fcr: float = 1):
+    def eat(self, feed_weight, fcr: float, feed_type: POND_FEED_TYPES):
         """Quench hunger by amount of feed"""
         if feed_weight <= 0:
             return
@@ -78,10 +81,6 @@ class Fish(FishModel):
         can_eat = min(hunger_weight, feed_weight) # Can only eat as much as it is hungry
         quench_rate = can_eat / hunger_weight
         quench_level = quench_rate * hunger_level
-
-        pond = self.get_pond()
-        yield pond.containers['feed'].get(can_eat) # Catch feed
-        self.info(f"Eat feed weighing {can_eat}")
 
         yield self.containers['stomach'].put(quench_level) # Quench hunger
         self.info(f"Quenched {((quench_level * 100)/self.containers['stomach'].capacity):.2f}% of hunger")
@@ -99,19 +98,62 @@ class Fish(FishModel):
             "weight": round(self.containers['weight'].level)
         })
 
-    def hunt(self):
+        if feed_type == 'CANNIBALISM':
+            return
+
+        pond = self.get_pond()
+        yield pond.containers[feed_type].get(can_eat) # Update feed resource
+        self.info(f"Eat {feed_type} weighing {can_eat}")
+
+    def hunt(self, issolated=False):
         """Hunt for food in the pond"""
-        while self.active:
+        while self.active or issolated:
             t_hunt = self.rng.exponential(1/4)
             yield self.env.timeout(t_hunt)
-            self.info(f"Hunting for food in the pond")
+            self.info(f"Hunting for food in the pond")     
 
-            feeding_rank = self.get_feeding_rank()  
-            pond = self.get_pond()      
-            hunt_weight = pond.containers['feed'].level * feeding_rank
+            pond = self.get_pond()
+            if pond.containers['SUPPLIMENT_FEED'].level > 0:
+                yield self.env.process(self.hunt_feed('SUPPLIMENT_FEED'))
+                continue
 
-            self.info(f"Caught feed weighing {pond.containers['feed'].level}")
-            yield self.env.process(self.eat(feed_weight=hunt_weight, fcr=1)) # Eat
+            if pond.containers['NATURAL_FEED'].level > 0:
+                yield self.env.process(self.hunt_feed('NATURAL_FEED'))
+                continue
+
+            yield self.env.process(self.hunt_feed('CANNIBALISM'))
+                
+
+    def hunt_feed(self, feed_type: POND_FEED_TYPES):
+        pond = self.get_pond()
+        if feed_type == 'CANNIBALISM':
+            yield self.env.process(self.cannibalize())
+            return
+
+        feeding_rank = self.get_feeding_rank()   
+        feed_weight = pond.containers[feed_type].level * feeding_rank
+
+        self.info(f"Caught feed weighing {feed_weight}")
+        yield self.env.process(self.eat(feed_weight=feed_weight, fcr=1, feed_type=feed_type)) # Eat
+
+    def cannibalize(self):
+        yield self.env.timeout(0)
+        pond = self.get_pond()
+        # get a random fish that can quench hunger
+        hunger_weight = self.get_hunger_weight()
+        fishes: list[Fish] = self.sim.list_assets('Fish', lambda x: (getattr(x, 'id') in pond.fish_ids) and getattr(x, 'id') != self.id)
+        can_eat = [f.id for f in fishes if f.containers['weight'].level <= hunger_weight]
+        if len(can_eat) == 0:
+            return
+        
+        # eat and terminate fish
+        to_eat = np.random.choice(can_eat)
+        fish: Fish = self.sim.get_asset('Fish', to_eat)
+        feed_weight = fish.containers['weight'].level
+        self.info(f"Caught fish weighing {feed_weight}")
+        yield self.env.process(fish.terminate('CANNIBALISM'))
+        yield self.env.process(self.eat(feed_weight=feed_weight, fcr=1, feed_type='CANNIBALISM')) # Eat
+
 
     def excrete(self, excrete_weight):
         """Excrete waste"""
@@ -136,9 +178,9 @@ class Fish(FishModel):
         if health_lost > 0:
             pond.containers['health'].get(health_lost)
         
-    def digest(self):
+    def digest(self, issolated=False):
         """Release excrements after eating"""
-        while self.active:
+        while self.active or issolated:
             t_excrete = self.rng.exponential(1/12)
             yield self.env.timeout(t_excrete)
 
@@ -174,7 +216,7 @@ class Fish(FishModel):
         rate = (starving_rate + overfeeding_rate) * 0.1
         return self.containers['health'].level * rate
     
-    def health_check(self):        
+    def health_check(self, issolated=False):        
         while self.active:
             t_health = self.rng.exponential(1)
             yield self.env.timeout(t_health)
@@ -195,7 +237,7 @@ class Fish(FishModel):
                 yield self.containers['health'].get(loss)
     
             if self.containers['health'].level == 0:
-                yield self.env.process(self.terminate()) 
+                yield self.env.process(self.terminate("ENVIRONMENT")) 
 
     def exist(self):
         yield self.env.timeout(0)
@@ -205,6 +247,7 @@ class Fish(FishModel):
             self.processes['hunt'] = self.env.process(self.hunt()) # hunt for feed
             self.processes['digest'] = self.env.process(self.digest()) # excrete waste
 
-    def terminate(self):
+    def terminate(self, mortality:MORTALITY_TYPES='HARVEST'):
         yield self.env.timeout(0)
-        self.active = False        
+        self.active = False  
+        self.mortality = mortality

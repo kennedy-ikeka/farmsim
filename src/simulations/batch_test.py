@@ -244,3 +244,25 @@ class TestBatch:
         assert median_fish_size > fish_size
         assert batch.get_age() == until
         assert batch.active == active
+
+    @pytest.mark.parametrize("params", [
+        {
+            "batch_params": {"duration": 1, "cycle_id": "0"},
+            "count": 10,
+            "fish_size": 40,
+        },
+    ])
+    def test_sample_fishes(self, params):
+        batch_params = params["batch_params"]
+        count = params["count"]
+        fish_size = params["fish_size"]
+
+        sim = Simulation()
+        feed = Feed(sim=sim, farm_id="1", name="Random", size=1)
+        pond = Pond(sim=sim, type="Portable_Pond")
+        farm = Farm(sim=sim, id="1", name="Random", pond_ids=[pond.id], feed_ids=[feed.id], active=False)
+        fish_ids = [Fish(sim=sim, pond_id=pond.id, type="Catfish", options={"weight": fish_size}).id for _ in range(count)]
+
+        batch = Batch(sim=sim, farm_id=farm.id, pond_id=pond.id, fish_ids=fish_ids, **batch_params)
+        sim.env.process(batch.sample_fishes(True))
+        sim.env.run(until=batch_params['duration'])

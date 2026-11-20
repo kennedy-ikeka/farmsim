@@ -9,7 +9,6 @@ from src.models.feed import FeedModel
 
 TRANSACTION_TYPES = Literal["credit", "debit"]
 
-
 class FarmBusinessModel(BaseModel):
     capital: int = Field(default=100_000_00, description="The farming capital", ge=0)
     stocks: list[Stock] = Field(default_factory=list, min_length=1)
@@ -18,8 +17,10 @@ class FarmBusinessModel(BaseModel):
     feed_floating: dict[int, bool] = Field(default={0: False}, description="The interval for medicating fishes based on size")
     max_biomass_per_m3: dict[int, int] = Field(default={0: 30}, description="Max biomax for pond based on size")
     pond_contamination_limit: dict[int, float] = Field(default={0: .5}, description="Contamination limits based on size")
-    medication_interval: dict[int, int] = Field(default={0: 14}, description="The interval for medicating fishes based on size") # every 2weeks
-    stock_increase_rate: float = Field(default=0, description="The rate at which the stocking quantity increases", ge=0, le=1)
+    stock_increase_rate: float = Field(default=0, description="The rate at which the stocking quantity increases", ge=0, le=1) # TODO
+    medication_interval: dict[int, int] = Field(default={0: 14}, description="The interval for medicating fishes based on size") # every 2weeks TODO
+    sampling_interval: dict[int, int] = Field(default={0: 14}, description="The interval for sampling batches to get weights") # every 2weeks TODO
+    sampling_size: dict[int, int] = Field(default={0: 30}, description="The number of fishes to sample") # 30 TODO
 
     @field_validator('pond_contamination_limit')
     def vaidate_pond_contamination_limit(cls, v: dict[int, float]):
@@ -57,7 +58,6 @@ class FarmModel(Asset):
     feed_ids: list[str] = Field(default_factory=list, description="The feeds for the farm")
     cycle_ids: list[str] = Field(default_factory=list, description="The cycles implemented by the farm")
     stocking_pond_id: str = Field(default="", description="The ponds stocking portable pond")
-    kind: str = Field(default="Farm")
     
     def transact(self, type: TRANSACTION_TYPES, amount: int, item: str, entity_tag: str, quantity=1) -> Generator:
         ...

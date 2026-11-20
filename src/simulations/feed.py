@@ -20,7 +20,9 @@ class Feed(FeedModel):
         gram_rate = (self.rate/self.size) * sink_rate * 10
 
         # Get the cost
-        return to_kobo(gram_rate * weight)
+
+        cost = self.sim.inflated_price(gram_rate * weight)
+        return to_kobo(cost)
 
     def get_quantity(self):
         """Get the quantity of all feed batches"""
@@ -49,10 +51,10 @@ class Feed(FeedModel):
         i = len(self.containers)
         self.containers[f'{self.env.now}_{i}'] = Container(self.env, init=weight)
 
-    def expire(self):
+    def expire(self, issolated=False):
         """Expire feed batches"""       
         # Checks onces every day
-        while self.active:
+        while self.active or issolated:
             yield self.env.timeout(1)
             self.info("Checking for expired feed batches")
 

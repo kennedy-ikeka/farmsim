@@ -50,4 +50,3 @@ FISH_SIZE_DETAILS = {
 class FishModel(AnimalModel):
     pond_id: str = Field(..., description="The id of the fish pond")
     type: FISH_TYPES = Field(..., description="The type of fish")
-    kind: str = Field(default="Fish")

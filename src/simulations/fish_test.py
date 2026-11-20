@@ -134,7 +134,7 @@ class TestFish():
         pond = Pond(sim=sim, type="Concrete_Pond")
         fish = Fish(sim=sim, pond_id=pond.id, **fish_params)
 
-        eat_process = fish.eat(feed_weight, feed_rate)
+        eat_process = fish.eat(feed_weight, feed_rate, 'NATURAL_FEED')
         if feed_weight:
             next(eat_process)
             next(eat_process)
@@ -267,4 +267,26 @@ class TestFish():
 
         assert fish_pond_health_effect == pond_health_effect
         assert fish_stomach_health_effect == stomach_health_effect        
-    
+
+    @pytest.mark.parametrize("params", [
+        {
+            "fish_params": {"type": "Catfish", "options": {"weight": 10, "stomach": 50}},
+            "cannibalize": False,
+            "min_fish_weight": 1,
+            "count": 10,
+            "duration": 1
+        }
+    ])
+    def test_cannibalism(self, params):
+        fish_params = params['fish_params']
+        cannibalize = params['cannibalize']
+        min_fish_weight = params['min_fish_weight']
+        count = params['count']
+        duration = params['duration']
+
+        sim = Simulation()
+        pond = Pond(sim=sim, type="Concrete_Pond")
+        fish = Fish(sim=sim, pond_id=pond.id, **fish_params, active=False)
+
+        sim.env.process(fish.cannibalize())
+        sim.run(duration)

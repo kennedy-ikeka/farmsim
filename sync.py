@@ -11,7 +11,7 @@ async def sync():
     # await docs.sync_resources(GOOGLE_RESOURCE_ID)
 
     db = Knowledge('farm_data')
-    await db.sync_datasets(GOOGLE_SHEET_ID)
+    await db.sync_datasets(GOOGLE_SHEET_ID, injest=False)
 
 if __name__ == "__main__":
     asyncio.run(sync())

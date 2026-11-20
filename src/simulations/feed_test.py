@@ -1,6 +1,7 @@
 from pydantic import ValidationError
 import pytest
 
+from simulations.simulation import Simulation
 from src.simulations.feed import Feed
 
 class TestFeed:
@@ -99,7 +100,8 @@ class TestFeed:
         weight = params['weight']
         feed_cost = params["feed_cost"]
 
-        feed = Feed(name="Random", **feed_params)
+        sim = Simulation()
+        feed = Feed(name="Random", **feed_params, sim=sim)
         cost = feed.get_cost(weight)
         assert cost == feed_cost
         

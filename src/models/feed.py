@@ -14,7 +14,6 @@ class FeedModel(Asset):
     floats: bool = Field(default=True, description="Does the feed sink in water")
     rate: float = Field(default=1.0, description="The conversion rate of the feed")
     farm_id: Optional[str] = Field(default=None, description="The farm id for the feed")
-    kind: str = Field(default="Feed")
 
     def expire(self) -> Generator:
         ...
