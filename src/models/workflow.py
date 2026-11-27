@@ -6,8 +6,8 @@ from uuid import uuid4
 from langgraph.graph import StateGraph, add_messages
 from pydantic import BaseModel, Field, computed_field
 
-from src.lib.logger import get_logger
-from src.lib.tool_set import AgentTool
+from src.utils.logger import get_logger
+from src.utils.tool_set import AgentTool
 from src.models.document import UploadDocument
 
 

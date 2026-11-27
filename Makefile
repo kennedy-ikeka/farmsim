@@ -8,6 +8,6 @@ sync:
 	python sync.py
 
 run:
-	streamlit run main.py
+	streamlit run app.py
 
 PHONY:

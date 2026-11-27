@@ -34,7 +34,7 @@ MODEL_DIR = os.path.join(BASE_DIR, "models")
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 TEMPERATURE = float(os.getenv('TEMPERATURE', 0))
 
-GOOGLE_CHAT_MODEL = os.getenv('GOOGLE_CHAT_MODEL', 'gemini-2.5-flash')
+GOOGLE_CHAT_MODEL = os.getenv('GOOGLE_CHAT_MODEL', 'gemini-2.5-flash-lite')
 GOOGLE_EMBEDDING_MODEL = os.getenv('GOOGLE_EMBEDDING_MODEL', 'models/gemini-embedding-001')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 GOOGLE_PROJECT_ID = os.getenv('GOOGLE_PROJECT_ID')
